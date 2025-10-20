@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Purchase Order Management</title>
+    
+    <!-- Core Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        vazir: ['Vazirmatn', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Vazirmatn', 'sans-serif';
+            background-color: #f3f4f6;
+        }
+        .dark body {
+            background-color: #111827;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .modal-content {
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            width: 95%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .print-options {
+                display: none;
+            }
+            #printable-po, #printable-po * {
+                visibility: visible;
+            }
+            #printable-po {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 0;
+                border: none;
+            }
+        }
+    </style>
+</head>
+<body class="dark">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ==================================================
+        // Supabase Client Setup
+        // ==================================================
+        const { createClient } = supabase;
+        const supabaseUrl = 'https://wehyjatotbzxargnxasg.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHlqYXRvdGJ6eGFyZ254YXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MTIwMjEsImV4cCI6MjA2NzQ4ODAyMX0.2R448DuEBlTrNvaYXiYZ8D5M7MJNv7n1qmIDHQBNFiY';
+        const supabaseClient = createClient(supabaseUrl, supabaseKey, { global: { fetch: window.fetch.bind(window) } });
+
+        // ==================================================
+        // Helper Functions & Constants
+        // ==================================================
+        const formatCurrency = (value) => {
+            if (value === null || typeof value === 'undefined' || isNaN(value)) return '۰';
+            return `${Number(value).toLocaleString('fa-IR')}`;
+        };
+
+        const formatNumberWithCommas = (value) => {
+            if (value === null || value === undefined || value === '' || isNaN(Number(value))) return '';
+            const stringValue = String(value).replace(/,/g, '');
+            const numberValue = Number(stringValue);
+            if (isNaN(numberValue)) return '';
+            return numberValue.toLocaleString('en-US');
+        };
+
+        const parseFormattedNumber = (value) => {
+            if (typeof value !== 'string' && typeof value !== 'number') return 0;
+            if(typeof value === 'number') return value;
+            return Number(String(value).replace(/,/g, '')) || 0;
+        };
+        
+        const PO_STATUSES = ['Pending Approval', 'Sent to Supplier', 'Partially Fulfilled', 'Fulfilled', 'Cancelled'];
+        const MY_COMPANY_PROFILE_ID = 'f83dca6b-9bc3-4bc2-8ac0-609a4147269b'; // Assuming your company has a profile ID
+
+        const getStatusStyles = (status) => {
+            switch (status) {
+                case 'Pending Approval': return 'bg-yellow-100 dark:bg-yellow-900/60 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700';
+                case 'Sent to Supplier': return 'bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700';
+                case 'Partially Fulfilled': return 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700';
+                case 'Fulfilled': return 'bg-green-100 dark:bg-green-900/60 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700';
+                case 'Cancelled': return 'bg-red-100 dark:bg-red-900/60 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700';
+                default: return 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600';
+            }
+        };
+
+        // ==================================================
+        // Toast Notification System
+        // ==================================================
+        const ToastContext = React.createContext();
+
+        const ToastProvider = ({ children }) => {
+            const [toast, setToast] = React.useState(null);
+
+            const showToast = (message, type = 'success') => {
+                setToast({ message, type });
+                setTimeout(() => setToast(null), 4000);
+            };
+
+            return (
+                <ToastContext.Provider value={showToast}>
+                    {children}
+                    {toast && (
+                        <div className={`fixed bottom-5 right-5 p-4 rounded-lg shadow-lg text-white text-sm font-semibold z-[200] ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+                            {toast.message}
+                        </div>
+                    )}
+                </ToastContext.Provider>
+            );
+        };
+
+        const useToast = () => React.useContext(ToastContext);
+
+
+        // ==================================================
+        // UI Components
+        // ==================================================
+        const Modal = ({ isOpen, onClose, title, children, showHeader = true }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" onClick={e => e.stopPropagation()}>
+                        {showHeader && (
+                             <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200 dark:border-gray-600">
+                                <h2 className="text-xl font-bold">{title}</h2>
+                                <button onClick={onClose} className="text-gray-400 hover:text-gray-800 dark:hover:text-white text-2xl">&times;</button>
+                            </div>
+                        )}
+                        {children}
+                    </div>
+                </div>
+            );
+        };
+
+        const SearchableDropdown = ({ options, value, onChange, placeholder = "Search..." }) => {
+            const [searchTerm, setSearchTerm] = React.useState('');
+            const [isOpen, setIsOpen] = React.useState(false);
+            const wrapperRef = React.useRef(null);
+
+            const selectedOption = React.useMemo(() => options.find(option => option.id === value), [options, value]);
+
+            React.useEffect(() => {
+                // Close dropdown on outside click
+                function handleClickOutside(event) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                        setIsOpen(false);
+                        if (selectedOption) {
+                           setSearchTerm(selectedOption.fullname);
+                        }
+                    }
+                }
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => {
+                    document.removeEventListener("mousedown", handleClickOutside);
+                };
+            }, [wrapperRef, selectedOption]);
+
+            const filteredOptions = React.useMemo(() => 
+                options.filter(option =>
+                    option.fullname.toLowerCase().includes(searchTerm.toLowerCase())
+                ), [options, searchTerm]);
+
+            const handleSelect = (optionId) => {
+                onChange(optionId);
+                setIsOpen(false);
+                const selected = options.find(o => o.id === optionId);
+                setSearchTerm(selected ? selected.fullname : '');
+            };
+            
+            const handleInputChange = (e) => {
+                setSearchTerm(e.target.value);
+                if (!isOpen) {
+                    setIsOpen(true);
+                }
+            };
+            
+            // On focus, clear the search term to show all options if it's not already open
+            const handleInputFocus = () => {
+                setIsOpen(true);
+                setSearchTerm('');
+            };
+
+            // On blur, close the dropdown
+            const handleInputBlur = () => {
+                // Use a small timeout to allow click event on options to register before closing
+                setTimeout(() => {
+                    if (selectedOption) {
+                        setSearchTerm(selectedOption.fullname);
+                    }
+                    setIsOpen(false);
+                }, 150);
+            };
+
+            return (
+                <div className="relative" ref={wrapperRef}>
+                    <input
+                        type="text"
+                        value={isOpen ? searchTerm : (selectedOption?.fullname || '')}
+                        onChange={handleInputChange}
+                        onFocus={handleInputFocus}
+                        onBlur={handleInputBlur}
+                        placeholder={placeholder}
+                        className="w-full bg-gray-100 dark:bg-gray-700 p-2 rounded-md mt-1"
+                    />
+                    {isOpen && (
+                        <ul className="absolute z-20 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md mt-1 max-h-60 overflow-y-auto shadow-lg">
+                            {filteredOptions.length > 0 ? (
+                                filteredOptions.map(option => (
+                                    <li
+                                        key={option.id}
+                                        onMouseDown={() => handleSelect(option.id)} // Use onMouseDown to fire before blur
+                                        className="p-2 hover:bg-indigo-500 hover:text-white cursor-pointer"
+                                    >
+                                        {option.fullname}
+                                    </li>
+                                ))
+                            ) : (
+                                <li className="p-2 text-gray-500">موردی یافت نشد.</li>
+                            )}
+                        </ul>
+                    )}
+                </div>
+            );
+        };
+
+
+        const ViewPOModal = ({ po, onClose }) => {
+            if (!po) return null;
+            return (
+                <Modal isOpen={!!po} onClose={onClose} title={`جزئیات سفارش خرید #${po.id}`}>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                            <div><span className="font-semibold">تامین کننده:</span> {po.supplier?.fullname || 'نامشخص'}</div>
+                            <div><span className="font-semibold">تاریخ ایجاد:</span> {new Date(po.created_at).toLocaleDateString('fa-IR')}</div>
+                            <div><span className="font-semibold">مربوط به فاکتور مشتری:</span> #{po.demandinvoice_id || 'نامشخص'}</div>
+                            <div><span className="font-semibold">مربوط به درخواست:</span> #{po.demandid || 'نامشخص'}</div>
+                            <div className="sm:col-span-2 border-t dark:border-gray-600 pt-2 mt-2"></div>
+                            <div><span className="font-semibold">جمع محصولات:</span> {formatCurrency(po.subtotal)} تومان</div>
+                            <div><span className="font-semibold">هزینه حمل واقعی:</span> {formatCurrency(po.actual_shipping_cost || 0)} تومان</div>
+                            <div className="font-bold sm:col-span-2 text-base"><span className="font-semibold">مبلغ کل نهایی:</span> {formatCurrency(po.totalAmount)} تومان</div>
+                        </div>
+                        <div className="overflow-x-auto border-t pt-4">
+                             <table className="w-full text-right text-sm">
+                                <thead>
+                                    <tr className="border-b dark:border-gray-700">
+                                        <th className="p-2">محصول</th>
+                                        <th className="p-2">تعداد</th>
+                                        <th className="p-2">قیمت خرید</th>
+                                        <th className="p-2">جمع کل</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {po.purchase_order_details.map(detail => {
+                                        const lineTotal = detail.quantity * detail.purchase_price;
+                                        return (
+                                            <tr key={detail.id} className="border-b dark:border-gray-700 last:border-b-0">
+                                                <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                                <td className="p-2">{detail.quantity}</td>
+                                                <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
+                                                <td className="p-2">{formatCurrency(lineTotal)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </Modal>
+            );
+        };
+
+        const EditPOModal = ({ po, onClose, onSave }) => {
+            const [details, setDetails] = React.useState(JSON.parse(JSON.stringify(po.purchase_order_details)));
+            const [actualShippingCost, setActualShippingCost] = React.useState(po.actual_shipping_cost || 0);
+            const [isSaving, setIsSaving] = React.useState(false);
+            const [suppliersList, setSuppliersList] = React.useState([]);
+            const [selectedSupplierId, setSelectedSupplierId] = React.useState(po.supplier_id);
+            const showToast = useToast();
+
+             React.useEffect(() => {
+                const fetchSuppliers = async () => {
+                    // Filter for suppliers with roleid = 3, as requested and fixed
+                    const { data, error } = await supabaseClient
+                        .from('profiles')
+                        .select('id, fullname')
+                        .eq('roleid', 3);
+                        
+                    if (error) {
+                        console.error('Error fetching suppliers:', error);
+                        showToast('خطا در دریافت لیست تامین کنندگان', 'error');
+                    } else {
+                        setSuppliersList(data);
+                    }
+                };
+                fetchSuppliers();
+            }, [showToast]);
+
+            const handleDetailChange = (index, field, value) => {
+                const newDetails = [...details];
+                newDetails[index][field] = value;
+                setDetails(newDetails);
+            };
+
+            const handleSave = async () => {
+                setIsSaving(true);
+                try {
+                    await onSave(po.id, details, actualShippingCost, selectedSupplierId);
+                } catch (error) {
+                    showToast(`خطا در ذخیره سازی: ${error.message}`, 'error');
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+
+            const subtotal = details.reduce((sum, d) => sum + (parseFormattedNumber(d.quantity) * parseFormattedNumber(d.purchase_price)), 0);
+            const totalAmount = subtotal + parseFormattedNumber(actualShippingCost);
+
+            return (
+                <Modal isOpen={!!po} onClose={onClose} title={`ویرایش سفارش خرید #${po.id}`}>
+                    <div className="space-y-4">
+                         <div className="mb-4 pb-4 border-b dark:border-gray-700">
+                            <label htmlFor="supplier-select" className="font-semibold text-sm">تغییر تامین کننده:</label>
+                             <SearchableDropdown
+                                options={suppliersList}
+                                value={selectedSupplierId}
+                                onChange={setSelectedSupplierId}
+                                placeholder="جستجوی تامین کننده..."
+                            />
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-right text-sm">
+                                <thead>
+                                    <tr className="border-b dark:border-gray-700"><th className="p-2">محصول</th><th className="p-2">تعداد</th><th className="p-2">قیمت خرید</th></tr>
+                                </thead>
+                                <tbody>
+                                    {details.map((detail, index) => (
+                                        <tr key={detail.id}>
+                                            <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                            <td className="p-2">
+                                                <input type="number" value={detail.quantity} onChange={(e) => handleDetailChange(index, 'quantity', e.target.value)} className="w-24 bg-gray-100 dark:bg-gray-700 p-1 rounded-md text-center"/>
+                                            </td>
+                                            <td className="p-2">
+                                                <input type="text" value={formatNumberWithCommas(detail.purchase_price)} onChange={(e) => handleDetailChange(index, 'purchase_price', parseFormattedNumber(e.target.value))} className="w-32 bg-gray-100 dark:bg-gray-700 p-1 rounded-md text-center"/>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="border-t dark:border-gray-700 pt-4">
+                            <label htmlFor="shipping-cost" className="font-semibold text-sm">هزینه حمل واقعی:</label>
+                            <input 
+                                id="shipping-cost"
+                                type="text" 
+                                value={formatNumberWithCommas(actualShippingCost)} 
+                                onChange={(e) => setActualShippingCost(parseFormattedNumber(e.target.value))} 
+                                className="w-40 bg-gray-100 dark:bg-gray-700 p-1 rounded-md text-center mr-2"
+                            />
+                        </div>
+                        <div className="text-left font-bold text-lg mt-2 border-t pt-4 dark:border-gray-700">
+                            مبلغ کل جدید: {formatCurrency(totalAmount)} تومان
+                        </div>
+                        <div className="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <button onClick={onClose} className="bg-gray-200 dark:bg-gray-600 py-2 px-4 rounded-lg">انصراف</button>
+                            <button onClick={handleSave} disabled={isSaving} className="bg-indigo-600 text-white py-2 px-4 rounded-lg disabled:bg-indigo-400">
+                                {isSaving ? 'در حال ذخیره...' : 'ذخیره تغییرات'}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            );
+        };
+
+        const PrintablePOModal = ({ po, onClose }) => {
+            const [myCompanyProfile, setMyCompanyProfile] = React.useState(null);
+
+            React.useEffect(() => {
+                const fetchCompanyProfile = async () => {
+                    const { data, error } = await supabaseClient
+                        .from('profiles')
+                        .select('fullname, national_id, mobile, location:locationid(postalcode, address, plaque)')
+                        .eq('id', MY_COMPANY_PROFILE_ID)
+                        .single();
+                    if (error) console.error("Error fetching company profile:", error);
+                    else setMyCompanyProfile(data);
+                };
+                fetchCompanyProfile();
+            }, []);
+
+            if (!po) return null;
+
+            return (
+                <Modal isOpen={!!po} onClose={onClose} showHeader={false}>
+                    <div id="printable-po" className="bg-white text-black p-8 font-vazir">
+                        <header className="flex justify-between items-start pb-4 border-b">
+                            <div>
+                                <h1 className="text-2xl font-bold">سفارش خرید (Purchase Order)</h1>
+                                <p>شماره سفارش: {po.id}</p>
+                                <p>تاریخ: {new Date(po.created_at).toLocaleDateString('fa-IR')}</p>
+                            </div>
+                        </header>
+                        <section className="grid grid-cols-2 gap-8 py-4 border-b text-sm">
+                            <div>
+                                <h2 className="font-bold mb-2">ارسال به (تامین کننده)</h2>
+                                <p><span className="font-semibold">نام:</span> {po.supplier?.fullname || '...'}</p>
+                                <p><span className="font-semibold">شماره تماس:</span> {po.supplier?.mobile || '--'}</p>
+                                <p><span className="font-semibold">آدرس:</span> {`${po.supplier?.location?.address || '--'} ${po.supplier?.location?.plaque ? `پلاک ${po.supplier.location.plaque}` : ''}`.trim()}</p>
+                                <p><span className="font-semibold">کدپستی:</span> {po.supplier?.location?.postalcode || '--'}</p>
+                            </div>
+                             <div>
+                                <h2 className="font-bold mb-2">خریدار</h2>
+                                <p><span className="font-semibold">نام:</span> {myCompanyProfile?.fullname || '...'}</p>
+                                <p><span className="font-semibold">کد اقتصادی:</span> {myCompanyProfile?.national_id || '--'}</p>
+                                <p><span className="font-semibold">شماره تماس:</span> {myCompanyProfile?.mobile || '--'}</p>
+                                <p><span className="font-semibold">آدرس:</span> {`${myCompanyProfile?.location?.address || '--'} ${myCompanyProfile?.location?.plaque ? `پلاک ${myCompanyProfile.location.plaque}` : ''}`.trim()}</p>
+                            </div>
+                        </section>
+                        <section className="py-4">
+                             <table className="w-full text-right text-sm">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="p-2 font-semibold">ش</th>
+                                        <th className="p-2 font-semibold">شرح محصول</th>
+                                        <th className="p-2 font-semibold">تعداد</th>
+                                        <th className="p-2 font-semibold">قیمت واحد</th>
+                                        <th className="p-2 font-semibold">جمع کل</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {po.purchase_order_details.map((detail, index) => (
+                                        <tr key={detail.id} className="border-b">
+                                            <td className="p-2">{index + 1}</td>
+                                            <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                            <td className="p-2">{detail.quantity}</td>
+                                            <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
+                                            <td className="p-2">{formatCurrency(detail.quantity * detail.purchase_price)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                             </table>
+                        </section>
+                         <footer className="pt-4 border-t">
+                            <div className="flex justify-end">
+                                <div className="text-left space-y-2 text-sm w-1/2 max-w-xs">
+                                    <div className="flex justify-between gap-4">
+                                        <span>جمع محصولات:</span>
+                                        <span>{formatCurrency(po.subtotal)} تومان</span>
+                                    </div>
+                                    <div className="flex justify-between gap-4">
+                                        <span>هزینه حمل واقعی:</span>
+                                        <span>{formatCurrency(po.actual_shipping_cost || 0)} تومان</span>
+                                    </div>
+                                    <div className="flex justify-between gap-4 font-bold text-base border-t border-gray-300 pt-2 mt-2">
+                                        <span>جمع کل سفارش:</span>
+                                        <span>{formatCurrency(po.totalAmount)} تومان</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </footer>
+                    </div>
+                    <div className="flex justify-end gap-4 mt-4 print-options">
+                        <button onClick={onClose} className="bg-gray-200 dark:bg-gray-600 py-2 px-4 rounded-lg">بستن</button>
+                        <button onClick={() => window.print()} className="bg-indigo-600 text-white py-2 px-4 rounded-lg">چاپ</button>
+                    </div>
+                </Modal>
+            );
+        };
+
+        const PurchaseOrderManagement = () => {
+            const [purchaseOrders, setPurchaseOrders] = React.useState([]);
+            const [isLoading, setIsLoading] = React.useState(true);
+            const [error, setError] = React.useState('');
+            const [viewingPO, setViewingPO] = React.useState(null);
+            const [editingPO, setEditingPO] = React.useState(null);
+            const [printingPO, setPrintingPO] = React.useState(null);
+            const [statusFilter, setStatusFilter] = React.useState('All');
+            const [searchTerm, setSearchTerm] = React.useState('');
+            const showToast = useToast();
+
+            const fetchData = React.useCallback(async () => {
+                setIsLoading(true);
+                setError('');
+                try {
+                    let query = supabaseClient
+                        .from('purchase_orders')
+                        .select(`
+                            id,
+                            created_at,
+                            status,
+                            demandinvoice_id,
+                            demandid,
+                            actual_shipping_cost,
+                            supplier_id,
+                            supplier:supplier_id(fullname, mobile, location:locationid(postalcode, address, plaque)),
+                            purchase_order_details(
+                                id,
+                                quantity,
+                                purchase_price,
+                                demand_item_id,
+                                demand_item:demand_item_id(product:productid(title))
+                            )
+                        `)
+                        .order('created_at', { ascending: false });
+
+                    if (statusFilter !== 'All') {
+                        query = query.eq('status', statusFilter);
+                    }
+
+                    const { data, error: fetchError } = await query;
+
+                    if (fetchError) throw fetchError;
+                    
+                    const processedData = data.map(po => {
+                        const subtotal = po.purchase_order_details.reduce((sum, detail) => sum + (detail.quantity * detail.purchase_price), 0);
+                        return {
+                            ...po,
+                            subtotal,
+                            totalAmount: subtotal + (po.actual_shipping_cost || 0)
+                        };
+                    });
+                    
+                    setPurchaseOrders(processedData);
+
+                } catch (err) {
+                    console.error("Error fetching purchase orders:", err);
+                    setError(`خطا در بارگذاری اطلاعات: ${err.message}`);
+                } finally {
+                    setIsLoading(false);
+                }
+            }, [statusFilter]);
+            
+            React.useEffect(() => {
+                fetchData();
+            }, [fetchData]);
+            
+            const handleUpdateStatus = async (poId, newStatus) => {
+                const poToUpdate = purchaseOrders.find(po => po.id === poId);
+                if (!poToUpdate) return;
+                
+                // Optimistic UI update
+                setPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? {...po, status: newStatus} : po));
+
+                const { error: updateError } = await supabaseClient
+                    .from('purchase_orders')
+                    .update({ status: newStatus })
+                    .eq('id', poId);
+                
+                if (updateError) {
+                    console.error("Error updating status:", updateError);
+                    // Revert on error
+                    setPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? {...po, status: poToUpdate.status} : po));
+                    showToast(`خطا در بروزرسانی وضعیت: ${updateError.message}`, 'error');
+                } else {
+                    showToast('وضعیت با موفقیت بروزرسانی شد.');
+                }
+            };
+
+            const handleSavePO = async (poId, updatedDetails, actualShippingCost, supplierId) => {
+                try {
+                    const detailUpdatePromises = updatedDetails.map(detail =>
+                        supabaseClient
+                            .from('purchase_order_details')
+                            .update({
+                                quantity: parseFormattedNumber(detail.quantity),
+                                purchase_price: parseFormattedNumber(detail.purchase_price)
+                            })
+                            .eq('id', detail.id)
+                    );
+
+                    const poUpdatePromise = supabaseClient
+                        .from('purchase_orders')
+                        .update({ 
+                            actual_shipping_cost: parseFormattedNumber(actualShippingCost),
+                            supplier_id: supplierId
+                        })
+                        .eq('id', poId);
+
+                    const results = await Promise.all([...detailUpdatePromises, poUpdatePromise]);
+                    
+                    const firstError = results.find(res => res.error);
+                    if (firstError) throw firstError.error;
+                    
+                    showToast('سفارش خرید با موفقیت بروزرسانی شد.');
+                    setEditingPO(null);
+                    fetchData(); // Refresh data to show changes
+                } catch(err) {
+                    console.error("Error saving PO:", err);
+                    throw err; // Re-throw to be caught in EditPOModal
+                }
+            };
+            
+            const displayedPOs = React.useMemo(() => {
+                if (!searchTerm) return purchaseOrders;
+                const lowercasedFilter = searchTerm.toLowerCase();
+                return purchaseOrders.filter(po => 
+                    po.id.toString().includes(lowercasedFilter) ||
+                    po.demandid.toString().includes(lowercasedFilter) ||
+                    (po.supplier?.fullname && po.supplier.fullname.toLowerCase().includes(lowercasedFilter))
+                );
+            }, [purchaseOrders, searchTerm]);
+
+            return (
+                 <div className="p-4 md:p-8 text-gray-900 dark:text-gray-100 min-h-screen">
+                    <header className="mb-8">
+                        <h1 className="text-3xl font-bold">مدیریت سفارشات خرید (PO)</h1>
+                        <p className="text-gray-500 dark:text-gray-400 mt-1">سفارشات ارسال شده به تامین کنندگان را پیگیری کنید.</p>
+                    </header>
+
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-8 flex flex-col md:flex-row gap-4">
+                         <div className="flex-1">
+                            <label htmlFor="status-filter" className="block text-sm font-medium mb-1">فیلتر بر اساس وضعیت:</label>
+                            <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600">
+                                <option value="All">همه وضعیت ها</option>
+                                {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label htmlFor="search-filter" className="block text-sm font-medium mb-1">جستجو:</label>
+                            <input 
+                                id="search-filter"
+                                type="text"
+                                placeholder="شماره PO، شماره درخواست، نام تامین کننده..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600"
+                            />
+                        </div>
+                    </div>
+
+                    {isLoading && <div className="spinner"></div>}
+                    {error && <p className="text-center p-8 text-red-500 bg-red-100 dark:bg-red-900/50 rounded-lg">{error}</p>}
+                    
+                    {!isLoading && !error && (
+                         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                            {/* Desktop Table */}
+                            <div className="hidden md:block">
+                                <table className="w-full text-right">
+                                    <thead>
+                                        <tr className="border-b dark:border-gray-700">
+                                            <th className="p-3 font-semibold">شماره PO</th>
+                                            <th className="p-3 font-semibold">شماره درخواست</th>
+                                            <th className="p-3 font-semibold">تامین کننده</th>
+                                            <th className="p-3 font-semibold">تاریخ</th>
+                                            <th className="p-3 font-semibold">هزینه حمل واقعی</th>
+                                            <th className="p-3 font-semibold">مبلغ کل نهایی</th>
+                                            <th className="p-3 font-semibold">وضعیت</th>
+                                            <th className="p-3 font-semibold">عملیات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {displayedPOs.map(po => (
+                                            <tr key={po.id} className="border-b dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
+                                                <td className="p-3 font-mono">#{po.id}</td>
+                                                <td className="p-3 font-mono">#{po.demandid}</td>
+                                                <td className="p-3">{po.supplier?.fullname || 'نامشخص'}</td>
+                                                <td className="p-3">{new Date(po.created_at).toLocaleDateString('fa-IR')}</td>
+                                                <td className="p-3 font-semibold">{formatCurrency(po.actual_shipping_cost || 0)}</td>
+                                                <td className="p-3 font-semibold">{formatCurrency(po.totalAmount)}</td>
+                                                <td className="p-3">
+                                                    <select value={po.status} onChange={(e) => handleUpdateStatus(po.id, e.target.value)} className={`rounded-md p-1 border text-sm w-full ${getStatusStyles(po.status)}`}>
+                                                        {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                                    </select>
+                                                </td>
+                                                <td className="p-3 space-x-4 space-x-reverse">
+                                                    <button onClick={() => setEditingPO(po)} disabled={po.status !== 'Pending Approval'} className="text-yellow-500 hover:text-yellow-600 text-sm font-semibold disabled:text-gray-400 disabled:cursor-not-allowed">ویرایش</button>
+                                                    <button onClick={() => setViewingPO(po)} className="text-indigo-500 hover:text-indigo-600 text-sm font-semibold">جزئیات</button>
+                                                    <button onClick={() => setPrintingPO(po)} className="text-green-500 hover:text-green-600 text-sm font-semibold">چاپ</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {/* Mobile Card View */}
+                            <div className="md:hidden space-y-4">
+                                 {displayedPOs.map(po => (
+                                    <div key={po.id} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg shadow">
+                                        <div className="flex justify-between items-center mb-3 pb-3 border-b dark:border-gray-600">
+                                            <div>
+                                                <span className="text-sm text-gray-500 dark:text-gray-400">سفارش #{po.id}</span>
+                                                <p className="font-semibold">{po.supplier?.fullname || 'نامشخص'}</p>
+                                                <p className="text-xs text-gray-400 mt-1">درخواست #{po.demandid}</p>
+                                            </div>
+                                            <p className="text-sm">{new Date(po.created_at).toLocaleDateString('fa-IR')}</p>
+                                        </div>
+                                        <div className="mb-3">
+                                             <label className="text-xs text-gray-500 dark:text-gray-400">وضعیت</label>
+                                             <select value={po.status} onChange={(e) => handleUpdateStatus(po.id, e.target.value)} className={`w-full rounded-md p-2 mt-1 border text-sm ${getStatusStyles(po.status)}`}>
+                                                 {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                             </select>
+                                        </div>
+                                        <div className="mb-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm text-gray-500 dark:text-gray-400">جمع محصولات</span>
+                                                <p className="font-semibold">{formatCurrency(po.subtotal)} تومان</p>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <span className="text-sm text-gray-500 dark:text-gray-400">هزینه حمل واقعی</span>
+                                                <p className="font-semibold">{formatCurrency(po.actual_shipping_cost || 0)} تومان</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center mb-3 pt-2 border-t dark:border-gray-600">
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">مبلغ کل نهایی</span>
+                                            <p className="font-bold text-lg">{formatCurrency(po.totalAmount)} تومان</p>
+                                        </div>
+                                        <div className="flex justify-end gap-4 border-t dark:border-gray-600 pt-3">
+                                            <button onClick={() => setEditingPO(po)} disabled={po.status !== 'Pending Approval'} className="text-yellow-500 text-sm font-semibold disabled:text-gray-400">ویرایش</button>
+                                            <button onClick={() => setViewingPO(po)} className="text-indigo-500 text-sm font-semibold">جزئیات</button>
+                                            <button onClick={() => setPrintingPO(po)} className="text-green-500 text-sm font-semibold">چاپ</button>
+                                        </div>
+                                    </div>
+                                 ))}
+                            </div>
+                             {displayedPOs.length === 0 && (
+                                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                    </svg>
+                                    <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">هیچ سفارشی یافت نشد</h3>
+                                    <p className="mt-1 text-sm">با تغییر فیلترها یا عبارت جستجو دوباره امتحان کنید.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                     {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} />}
+                     {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} />}
+                     {printingPO && <PrintablePOModal po={printingPO} onClose={() => setPrintingPO(null)} />}
+                </div>
+            );
+        };
+
+        const App = () => <PurchaseOrderManagement />;
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(
+            <ToastProvider>
+                <App />
+            </ToastProvider>
+        );
+    </script>
+</body>
+</html>
+
