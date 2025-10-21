@@ -125,7 +125,7 @@
             return Number(String(value).replace(/,/g, '')) || 0;
         };
         
-        const PO_STATUSES = ['Pending Approval', 'Sent to Supplier', 'Partially Fulfilled', 'Fulfilled', 'Cancelled'];
+        const PO_STATUSES = ['Pending Approval', 'Sent to Supplier', 'Partially Fulfilled', 'Fulfilled', 'Cancelled', 'Merged'];
         const MY_COMPANY_PROFILE_ID = 'f83dca6b-9bc3-4bc2-8ac0-609a4147269b'; // Assuming your company has a profile ID
 
         const getStatusStyles = (status) => {
@@ -135,6 +135,7 @@
                 case 'Partially Fulfilled': return 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700';
                 case 'Fulfilled': return 'bg-green-100 dark:bg-green-900/60 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700';
                 case 'Cancelled': return 'bg-red-100 dark:bg-red-900/60 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700';
+                case 'Merged': return 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-400 dark:border-gray-600';
                 default: return 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600';
             }
         };
@@ -177,9 +178,9 @@
                     <div className="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" onClick={e => e.stopPropagation()}>
                         {showHeader && (
                              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200 dark:border-gray-600">
-                                <h2 className="text-xl font-bold">{title}</h2>
-                                <button onClick={onClose} className="text-gray-400 hover:text-gray-800 dark:hover:text-white text-2xl">&times;</button>
-                            </div>
+                                 <h2 className="text-xl font-bold">{title}</h2>
+                                 <button onClick={onClose} className="text-gray-400 hover:text-gray-800 dark:hover:text-white text-2xl">&times;</button>
+                             </div>
                         )}
                         {children}
                     </div>
@@ -289,6 +290,7 @@
                             <div><span className="font-semibold">تاریخ ایجاد:</span> {new Date(po.created_at).toLocaleDateString('fa-IR')}</div>
                             <div><span className="font-semibold">مربوط به فاکتور مشتری:</span> #{po.demandinvoice_id || 'نامشخص'}</div>
                             <div><span className="font-semibold">مربوط به درخواست:</span> #{po.demandid || 'نامشخص'}</div>
+                            <div className="sm:col-span-2"><span className="font-semibold">مشتری:</span> {po.demand?.customer?.fullname || 'نامشخص'}</div>
                             <div className="sm:col-span-2 border-t dark:border-gray-600 pt-2 mt-2"></div>
                             <div><span className="font-semibold">جمع محصولات:</span> {formatCurrency(po.subtotal)} تومان</div>
                             <div><span className="font-semibold">هزینه حمل واقعی:</span> {formatCurrency(po.actual_shipping_cost || 0)} تومان</div>
@@ -296,28 +298,28 @@
                         </div>
                         <div className="overflow-x-auto border-t pt-4">
                              <table className="w-full text-right text-sm">
-                                <thead>
-                                    <tr className="border-b dark:border-gray-700">
-                                        <th className="p-2">محصول</th>
-                                        <th className="p-2">تعداد</th>
-                                        <th className="p-2">قیمت خرید</th>
-                                        <th className="p-2">جمع کل</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {po.purchase_order_details.map(detail => {
-                                        const lineTotal = detail.quantity * detail.purchase_price;
-                                        return (
-                                            <tr key={detail.id} className="border-b dark:border-gray-700 last:border-b-0">
-                                                <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
-                                                <td className="p-2">{detail.quantity}</td>
-                                                <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
-                                                <td className="p-2">{formatCurrency(lineTotal)}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                 <thead>
+                                     <tr className="border-b dark:border-gray-700">
+                                         <th className="p-2">محصول</th>
+                                         <th className="p-2">تعداد</th>
+                                         <th className="p-2">قیمت خرید</th>
+                                         <th className="p-2">جمع کل</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+                                     {po.purchase_order_details.map(detail => {
+                                         const lineTotal = detail.quantity * detail.purchase_price;
+                                         return (
+                                             <tr key={detail.id} className="border-b dark:border-gray-700 last:border-b-0">
+                                                 <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                                 <td className="p-2">{detail.quantity}</td>
+                                                 <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
+                                                 <td className="p-2">{formatCurrency(lineTotal)}</td>
+                                             </tr>
+                                         );
+                                     })}
+                                 </tbody>
+                             </table>
                         </div>
                     </div>
                 </Modal>
@@ -333,22 +335,22 @@
             const showToast = useToast();
 
              React.useEffect(() => {
-                const fetchSuppliers = async () => {
-                    // Filter for suppliers with roleid = 3, as requested and fixed
-                    const { data, error } = await supabaseClient
-                        .from('profiles')
-                        .select('id, fullname')
-                        .eq('roleid', 3);
-                        
-                    if (error) {
-                        console.error('Error fetching suppliers:', error);
-                        showToast('خطا در دریافت لیست تامین کنندگان', 'error');
-                    } else {
-                        setSuppliersList(data);
-                    }
-                };
-                fetchSuppliers();
-            }, [showToast]);
+                 const fetchSuppliers = async () => {
+                     // Filter for suppliers with roleid = 3, as requested and fixed
+                     const { data, error } = await supabaseClient
+                         .from('profiles')
+                         .select('id, fullname')
+                         .eq('roleid', 3);
+                         
+                     if (error) {
+                         console.error('Error fetching suppliers:', error);
+                         showToast('خطا در دریافت لیست تامین کنندگان', 'error');
+                     } else {
+                         setSuppliersList(data);
+                     }
+                 };
+                 fetchSuppliers();
+             }, [showToast]);
 
             const handleDetailChange = (index, field, value) => {
                 const newDetails = [...details];
@@ -374,14 +376,14 @@
                 <Modal isOpen={!!po} onClose={onClose} title={`ویرایش سفارش خرید #${po.id}`}>
                     <div className="space-y-4">
                          <div className="mb-4 pb-4 border-b dark:border-gray-700">
-                            <label htmlFor="supplier-select" className="font-semibold text-sm">تغییر تامین کننده:</label>
-                             <SearchableDropdown
-                                options={suppliersList}
-                                value={selectedSupplierId}
-                                onChange={setSelectedSupplierId}
-                                placeholder="جستجوی تامین کننده..."
-                            />
-                        </div>
+                             <label htmlFor="supplier-select" className="font-semibold text-sm">تغییر تامین کننده:</label>
+                              <SearchableDropdown
+                                 options={suppliersList}
+                                 value={selectedSupplierId}
+                                 onChange={setSelectedSupplierId}
+                                 placeholder="جستجوی تامین کننده..."
+                             />
+                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-right text-sm">
                                 <thead>
@@ -472,26 +474,26 @@
                         </section>
                         <section className="py-4">
                              <table className="w-full text-right text-sm">
-                                <thead className="bg-gray-100">
-                                    <tr>
-                                        <th className="p-2 font-semibold">ش</th>
-                                        <th className="p-2 font-semibold">شرح محصول</th>
-                                        <th className="p-2 font-semibold">تعداد</th>
-                                        <th className="p-2 font-semibold">قیمت واحد</th>
-                                        <th className="p-2 font-semibold">جمع کل</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {po.purchase_order_details.map((detail, index) => (
-                                        <tr key={detail.id} className="border-b">
-                                            <td className="p-2">{index + 1}</td>
-                                            <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
-                                            <td className="p-2">{detail.quantity}</td>
-                                            <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
-                                            <td className="p-2">{formatCurrency(detail.quantity * detail.purchase_price)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
+                                 <thead className="bg-gray-100">
+                                     <tr>
+                                         <th className="p-2 font-semibold">ش</th>
+                                         <th className="p-2 font-semibold">شرح محصول</th>
+                                         <th className="p-2 font-semibold">تعداد</th>
+                                         <th className="p-2 font-semibold">قیمت واحد</th>
+                                         <th className="p-2 font-semibold">جمع کل</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+                                     {po.purchase_order_details.map((detail, index) => (
+                                         <tr key={detail.id} className="border-b">
+                                             <td className="p-2">{index + 1}</td>
+                                             <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                             <td className="p-2">{detail.quantity}</td>
+                                             <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
+                                             <td className="p-2">{formatCurrency(detail.quantity * detail.purchase_price)}</td>
+                                         </tr>
+                                     ))}
+                                 </tbody>
                              </table>
                         </section>
                          <footer className="pt-4 border-t">
@@ -520,6 +522,32 @@
                 </Modal>
             );
         };
+        
+        const MergeConfirmationModal = ({ mergeInfo, onConfirm, onCancel, isMerging }) => {
+            if (!mergeInfo.possible) return null;
+        
+            return (
+                <Modal isOpen={true} onClose={onCancel} title="تایید ادغام سفارشات">
+                    <div className="space-y-4">
+                        <p>
+                            شما در حال ادغام <span className="font-bold">{mergeInfo.count}</span> سفارش خرید برای تامین کننده
+                            <span className="font-bold mx-1">{mergeInfo.supplierName}</span> به یک سفارش جدید هستید.
+                        </p>
+                        <p className="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-lg">
+                            توجه: پس از تایید، سفارشات اصلی به وضعیت 'Merged' تغییر کرده و دیگر قابل ویرایش نخواهند بود. این عملیات غیرقابل بازگشت است.
+                        </p>
+                        <p>آیا از ادامه کار اطمینان دارید؟</p>
+                        <div className="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <button onClick={onCancel} disabled={isMerging} className="bg-gray-200 dark:bg-gray-600 py-2 px-4 rounded-lg">انصراف</button>
+                            <button onClick={onConfirm} disabled={isMerging} className="bg-green-600 text-white py-2 px-4 rounded-lg disabled:bg-green-400">
+                                {isMerging ? 'در حال ادغام...' : 'بله، ادغام کن'}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            );
+        };
+
 
         const PurchaseOrderManagement = () => {
             const [purchaseOrders, setPurchaseOrders] = React.useState([]);
@@ -530,45 +558,92 @@
             const [printingPO, setPrintingPO] = React.useState(null);
             const [statusFilter, setStatusFilter] = React.useState('All');
             const [searchTerm, setSearchTerm] = React.useState('');
+            const [selectedPOs, setSelectedPOs] = React.useState(new Set());
+            const [showMergeConfirm, setShowMergeConfirm] = React.useState(false);
+            const [isMerging, setIsMerging] = React.useState(false);
             const showToast = useToast();
 
             const fetchData = React.useCallback(async () => {
                 setIsLoading(true);
                 setError('');
                 try {
-                    let query = supabaseClient
+                    // Base query for purchase orders
+                    let poQuery = supabaseClient
                         .from('purchase_orders')
                         .select(`
-                            id,
-                            created_at,
-                            status,
-                            demandinvoice_id,
-                            demandid,
-                            actual_shipping_cost,
-                            supplier_id,
+                            id, created_at, status, demandinvoice_id, demandid, actual_shipping_cost, supplier_id,
                             supplier:supplier_id(fullname, mobile, location:locationid(postalcode, address, plaque)),
                             purchase_order_details(
-                                id,
-                                quantity,
-                                purchase_price,
-                                demand_item_id,
+                                id, quantity, purchase_price, demand_item_id,
                                 demand_item:demand_item_id(product:productid(title))
                             )
-                        `)
-                        .order('created_at', { ascending: false });
+                        `);
 
+                    // Apply status filter
                     if (statusFilter !== 'All') {
-                        query = query.eq('status', statusFilter);
+                        poQuery = poQuery.eq('status', statusFilter);
+                    }
+                    
+                    const { data: pos, error: poError } = await poQuery.order('created_at', { ascending: false });
+
+                    if (poError) throw poError;
+                    
+                    // If no results, exit early
+                    if (!pos || pos.length === 0) {
+                        setPurchaseOrders([]);
+                        setIsLoading(false);
+                        return;
                     }
 
-                    const { data, error: fetchError } = await query;
+                    // Collect unique demand IDs from the fetched POs
+                    const demandIds = [...new Set(pos.map(po => po.demandid).filter(Boolean))];
 
-                    if (fetchError) throw fetchError;
+                    if (demandIds.length === 0) {
+                        // No linked demands, process as is
+                        const processedData = pos.map(po => {
+                            const subtotal = po.purchase_order_details.reduce((sum, detail) => sum + (detail.quantity * detail.purchase_price), 0);
+                            return { ...po, subtotal, totalAmount: subtotal + (po.actual_shipping_cost || 0) };
+                        });
+                        setPurchaseOrders(processedData);
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    // Fetch related demands
+                    const { data: demands, error: demandError } = await supabaseClient
+                        .from('demand')
+                        .select('id, customeruserid')
+                        .in('id', demandIds);
                     
-                    const processedData = data.map(po => {
+                    if (demandError) throw demandError;
+                    
+                    // Collect unique customer IDs
+                    const customerIds = [...new Set(demands.map(d => d.customeruserid).filter(Boolean))];
+
+                    let customersMap = new Map();
+                    if (customerIds.length > 0) {
+                        // Fetch related customers (profiles)
+                        const { data: customers, error: customerError } = await supabaseClient
+                            .from('profiles')
+                            .select('id, fullname')
+                            .in('id', customerIds);
+                        
+                        if (customerError) throw customerError;
+                        customersMap = new Map(customers.map(c => [c.id, c]));
+                    }
+
+                    // Create a lookup map for demands, injecting customer info
+                    const demandsMap = new Map(demands.map(d => [d.id, { 
+                        ...d, 
+                        customer: customersMap.get(d.customeruserid) 
+                    }]));
+
+                    // Stitch all data together
+                    const processedData = pos.map(po => {
                         const subtotal = po.purchase_order_details.reduce((sum, detail) => sum + (detail.quantity * detail.purchase_price), 0);
                         return {
                             ...po,
+                            demand: demandsMap.get(po.demandid),
                             subtotal,
                             totalAmount: subtotal + (po.actual_shipping_cost || 0)
                         };
@@ -587,7 +662,38 @@
             React.useEffect(() => {
                 fetchData();
             }, [fetchData]);
-            
+
+            const mergeInfo = React.useMemo(() => {
+                if (selectedPOs.size < 2) return { possible: false };
+                const posToMerge = purchaseOrders.filter(po => selectedPOs.has(po.id));
+                if (posToMerge.length !== selectedPOs.size) return { possible: false };
+
+                const firstSupplierId = posToMerge[0]?.supplier_id;
+                const isSameSupplier = posToMerge.every(po => po.supplier_id === firstSupplierId);
+                const allPending = posToMerge.every(po => po.status === 'Pending Approval');
+
+                if (isSameSupplier && allPending) {
+                    return {
+                        possible: true,
+                        supplierId: firstSupplierId,
+                        supplierName: posToMerge[0]?.supplier?.fullname,
+                        count: posToMerge.length,
+                        poObjects: posToMerge,
+                    };
+                }
+                return { possible: false };
+            }, [selectedPOs, purchaseOrders]);
+
+            const handleSelectPO = (poId) => {
+                const newSelection = new Set(selectedPOs);
+                if (newSelection.has(poId)) {
+                    newSelection.delete(poId);
+                } else {
+                    newSelection.add(poId);
+                }
+                setSelectedPOs(newSelection);
+            };
+
             const handleUpdateStatus = async (poId, newStatus) => {
                 const poToUpdate = purchaseOrders.find(po => po.id === poId);
                 if (!poToUpdate) return;
@@ -643,6 +749,81 @@
                     throw err; // Re-throw to be caught in EditPOModal
                 }
             };
+
+            const handleConfirmMerge = async () => {
+                if (!mergeInfo.possible) {
+                    showToast('شرایط لازم برای ادغام سفارشات وجود ندارد.', 'error');
+                    return;
+                }
+                setIsMerging(true);
+                try {
+                    // 1. Aggregate items
+                    const mergedItems = new Map();
+                    mergeInfo.poObjects.forEach(po => {
+                        po.purchase_order_details.forEach(detail => {
+                            const key = detail.demand_item_id;
+                            if (mergedItems.has(key)) {
+                                const existing = mergedItems.get(key);
+                                existing.quantity = Number(existing.quantity) + Number(detail.quantity);
+                            } else {
+                                mergedItems.set(key, { ...detail });
+                            }
+                        });
+                    });
+                    
+                    // 2. Create the new merged PO
+                    const { data: newPO, error: newPOError } = await supabaseClient
+                        .from('purchase_orders')
+                        .insert({
+                            supplier_id: mergeInfo.supplierId,
+                            status: 'Pending Approval',
+                            // Inherit demandid and invoiceid from the first PO
+                            demandid: mergeInfo.poObjects[0].demandid,
+                            demandinvoice_id: mergeInfo.poObjects[0].demandinvoice_id,
+                        })
+                        .select()
+                        .single();
+
+                    if (newPOError) throw newPOError;
+
+                    // 3. Create the new aggregated details
+                    const newDetails = Array.from(mergedItems.values()).map(item => ({
+                        purchase_order_id: newPO.id,
+                        demand_item_id: item.demand_item_id,
+                        quantity: item.quantity,
+                        purchase_price: item.purchase_price
+                    }));
+
+                    const { error: newDetailsError } = await supabaseClient
+                        .from('purchase_order_details')
+                        .insert(newDetails);
+                    
+                    if (newDetailsError) {
+                        // Cleanup attempt: delete the PO we just created
+                        await supabaseClient.from('purchase_orders').delete().eq('id', newPO.id);
+                        throw newDetailsError;
+                    }
+
+                    // 4. Update the old POs to 'Merged'
+                    const oldPoIds = mergeInfo.poObjects.map(po => po.id);
+                    const { error: updateOldError } = await supabaseClient
+                        .from('purchase_orders')
+                        .update({ status: 'Merged' })
+                        .in('id', oldPoIds);
+                    
+                    if (updateOldError) throw updateOldError;
+
+                    showToast(`سفارشات با موفقیت در سفارش جدید #${newPO.id} ادغام شدند.`);
+                } catch(err) {
+                    console.error("Error during merge:", err);
+                    showToast(`عملیات ادغام ناموفق بود: ${err.message}`, 'error');
+                } finally {
+                    setIsMerging(false);
+                    setShowMergeConfirm(false);
+                    setSelectedPOs(new Set());
+                    fetchData(); // Refresh list
+                }
+            };
             
             const displayedPOs = React.useMemo(() => {
                 if (!searchTerm) return purchaseOrders;
@@ -650,7 +831,8 @@
                 return purchaseOrders.filter(po => 
                     po.id.toString().includes(lowercasedFilter) ||
                     po.demandid.toString().includes(lowercasedFilter) ||
-                    (po.supplier?.fullname && po.supplier.fullname.toLowerCase().includes(lowercasedFilter))
+                    (po.supplier?.fullname && po.supplier.fullname.toLowerCase().includes(lowercasedFilter)) ||
+                    (po.demand?.customer?.fullname && po.demand.customer.fullname.toLowerCase().includes(lowercasedFilter))
                 );
             }, [purchaseOrders, searchTerm]);
 
@@ -661,24 +843,33 @@
                         <p className="text-gray-500 dark:text-gray-400 mt-1">سفارشات ارسال شده به تامین کنندگان را پیگیری کنید.</p>
                     </header>
 
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-8 flex flex-col md:flex-row gap-4">
-                         <div className="flex-1">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-8 flex flex-col md:flex-row gap-4 items-end">
+                         <div className="flex-grow">
                             <label htmlFor="status-filter" className="block text-sm font-medium mb-1">فیلتر بر اساس وضعیت:</label>
                             <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600">
                                 <option value="All">همه وضعیت ها</option>
                                 {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                             </select>
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-grow">
                             <label htmlFor="search-filter" className="block text-sm font-medium mb-1">جستجو:</label>
                             <input 
                                 id="search-filter"
                                 type="text"
-                                placeholder="شماره PO، شماره درخواست، نام تامین کننده..."
+                                placeholder="شماره PO، شماره درخواست، نام تامین کننده، نام مشتری..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600"
                             />
+                        </div>
+                        <div className="flex-shrink-0">
+                             <button 
+                                onClick={() => setShowMergeConfirm(true)}
+                                disabled={!mergeInfo.possible}
+                                className="w-full md:w-auto bg-green-600 text-white py-2 px-4 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                             >
+                                 ادغام ({selectedPOs.size}) سفارش
+                             </button>
                         </div>
                     </div>
 
@@ -687,99 +878,128 @@
                     
                     {!isLoading && !error && (
                          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                            {/* Desktop Table */}
-                            <div className="hidden md:block">
-                                <table className="w-full text-right">
-                                    <thead>
-                                        <tr className="border-b dark:border-gray-700">
-                                            <th className="p-3 font-semibold">شماره PO</th>
-                                            <th className="p-3 font-semibold">شماره درخواست</th>
-                                            <th className="p-3 font-semibold">تامین کننده</th>
-                                            <th className="p-3 font-semibold">تاریخ</th>
-                                            <th className="p-3 font-semibold">هزینه حمل واقعی</th>
-                                            <th className="p-3 font-semibold">مبلغ کل نهایی</th>
-                                            <th className="p-3 font-semibold">وضعیت</th>
-                                            <th className="p-3 font-semibold">عملیات</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {displayedPOs.map(po => (
-                                            <tr key={po.id} className="border-b dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
-                                                <td className="p-3 font-mono">#{po.id}</td>
-                                                <td className="p-3 font-mono">#{po.demandid}</td>
-                                                <td className="p-3">{po.supplier?.fullname || 'نامشخص'}</td>
-                                                <td className="p-3">{new Date(po.created_at).toLocaleDateString('fa-IR')}</td>
-                                                <td className="p-3 font-semibold">{formatCurrency(po.actual_shipping_cost || 0)}</td>
-                                                <td className="p-3 font-semibold">{formatCurrency(po.totalAmount)}</td>
-                                                <td className="p-3">
-                                                    <select value={po.status} onChange={(e) => handleUpdateStatus(po.id, e.target.value)} className={`rounded-md p-1 border text-sm w-full ${getStatusStyles(po.status)}`}>
-                                                        {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="p-3 space-x-4 space-x-reverse">
-                                                    <button onClick={() => setEditingPO(po)} disabled={po.status !== 'Pending Approval'} className="text-yellow-500 hover:text-yellow-600 text-sm font-semibold disabled:text-gray-400 disabled:cursor-not-allowed">ویرایش</button>
-                                                    <button onClick={() => setViewingPO(po)} className="text-indigo-500 hover:text-indigo-600 text-sm font-semibold">جزئیات</button>
-                                                    <button onClick={() => setPrintingPO(po)} className="text-green-500 hover:text-green-600 text-sm font-semibold">چاپ</button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {/* Mobile Card View */}
-                            <div className="md:hidden space-y-4">
-                                 {displayedPOs.map(po => (
-                                    <div key={po.id} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg shadow">
-                                        <div className="flex justify-between items-center mb-3 pb-3 border-b dark:border-gray-600">
-                                            <div>
-                                                <span className="text-sm text-gray-500 dark:text-gray-400">سفارش #{po.id}</span>
-                                                <p className="font-semibold">{po.supplier?.fullname || 'نامشخص'}</p>
-                                                <p className="text-xs text-gray-400 mt-1">درخواست #{po.demandid}</p>
-                                            </div>
-                                            <p className="text-sm">{new Date(po.created_at).toLocaleDateString('fa-IR')}</p>
-                                        </div>
-                                        <div className="mb-3">
-                                             <label className="text-xs text-gray-500 dark:text-gray-400">وضعیت</label>
-                                             <select value={po.status} onChange={(e) => handleUpdateStatus(po.id, e.target.value)} className={`w-full rounded-md p-2 mt-1 border text-sm ${getStatusStyles(po.status)}`}>
-                                                 {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                                             </select>
-                                        </div>
-                                        <div className="mb-3">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm text-gray-500 dark:text-gray-400">جمع محصولات</span>
-                                                <p className="font-semibold">{formatCurrency(po.subtotal)} تومان</p>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-1">
-                                                <span className="text-sm text-gray-500 dark:text-gray-400">هزینه حمل واقعی</span>
-                                                <p className="font-semibold">{formatCurrency(po.actual_shipping_cost || 0)} تومان</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-between items-center mb-3 pt-2 border-t dark:border-gray-600">
-                                            <span className="text-sm text-gray-500 dark:text-gray-400">مبلغ کل نهایی</span>
-                                            <p className="font-bold text-lg">{formatCurrency(po.totalAmount)} تومان</p>
-                                        </div>
-                                        <div className="flex justify-end gap-4 border-t dark:border-gray-600 pt-3">
-                                            <button onClick={() => setEditingPO(po)} disabled={po.status !== 'Pending Approval'} className="text-yellow-500 text-sm font-semibold disabled:text-gray-400">ویرایش</button>
-                                            <button onClick={() => setViewingPO(po)} className="text-indigo-500 text-sm font-semibold">جزئیات</button>
-                                            <button onClick={() => setPrintingPO(po)} className="text-green-500 text-sm font-semibold">چاپ</button>
-                                        </div>
-                                    </div>
-                                 ))}
-                            </div>
-                             {displayedPOs.length === 0 && (
-                                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                    </svg>
-                                    <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">هیچ سفارشی یافت نشد</h3>
-                                    <p className="mt-1 text-sm">با تغییر فیلترها یا عبارت جستجو دوباره امتحان کنید.</p>
-                                </div>
-                            )}
-                        </div>
+                             {/* Desktop Table */}
+                             <div className="hidden md:block overflow-x-auto">
+                                 <table className="w-full text-right">
+                                     <thead>
+                                         <tr className="border-b dark:border-gray-700">
+                                            <th className="p-3 font-semibold w-12 text-center">
+                                                <input type="checkbox" className="rounded" disabled />
+                                            </th>
+                                             <th className="p-3 font-semibold">شماره PO</th>
+                                             <th className="p-3 font-semibold">شماره درخواست</th>
+                                             <th className="p-3 font-semibold">تامین کننده</th>
+                                             <th className="p-3 font-semibold">نام مشتری</th>
+                                             <th className="p-3 font-semibold">تاریخ</th>
+                                             <th className="p-3 font-semibold">هزینه حمل واقعی</th>
+                                             <th className="p-3 font-semibold">مبلغ کل نهایی</th>
+                                             <th className="p-3 font-semibold">وضعیت</th>
+                                             <th className="p-3 font-semibold">عملیات</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody>
+                                         {displayedPOs.map(po => (
+                                             <tr key={po.id} className="border-b dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
+                                                 <td className="p-3 text-center">
+                                                     {po.status === 'Pending Approval' && (
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="rounded" 
+                                                            checked={selectedPOs.has(po.id)}
+                                                            onChange={() => handleSelectPO(po.id)}
+                                                        />
+                                                     )}
+                                                 </td>
+                                                 <td className="p-3 font-mono">#{po.id}</td>
+                                                 <td className="p-3 font-mono">#{po.demandid}</td>
+                                                 <td className="p-3">{po.supplier?.fullname || 'نامشخص'}</td>
+                                                 <td className="p-3">{po.demand?.customer?.fullname || 'نامشخص'}</td>
+                                                 <td className="p-3">{new Date(po.created_at).toLocaleDateString('fa-IR')}</td>
+                                                 <td className="p-3 font-semibold">{formatCurrency(po.actual_shipping_cost || 0)}</td>
+                                                 <td className="p-3 font-semibold">{formatCurrency(po.totalAmount)}</td>
+                                                 <td className="p-3">
+                                                     <select value={po.status} onChange={(e) => handleUpdateStatus(po.id, e.target.value)} className={`rounded-md p-1 border text-sm w-full ${getStatusStyles(po.status)}`}>
+                                                         {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                                     </select>
+                                                 </td>
+                                                 <td className="p-3 space-x-4 space-x-reverse whitespace-nowrap">
+                                                     <button onClick={() => setEditingPO(po)} disabled={po.status !== 'Pending Approval'} className="text-yellow-500 hover:text-yellow-600 text-sm font-semibold disabled:text-gray-400 disabled:cursor-not-allowed">ویرایش</button>
+                                                     <button onClick={() => setViewingPO(po)} className="text-indigo-500 hover:text-indigo-600 text-sm font-semibold">جزئیات</button>
+                                                     <button onClick={() => setPrintingPO(po)} className="text-green-500 hover:text-green-600 text-sm font-semibold">چاپ</button>
+                                                 </td>
+                                             </tr>
+                                         ))}
+                                     </tbody>
+                                 </table>
+                             </div>
+                             {/* Mobile Card View */}
+                             <div className="md:hidden space-y-4">
+                                  {displayedPOs.map(po => (
+                                      <div key={po.id} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg shadow">
+                                          <div className="flex justify-between items-start mb-3 pb-3 border-b dark:border-gray-600">
+                                              <div>
+                                                <div className="flex items-start gap-3">
+                                                    {po.status === 'Pending Approval' && (
+                                                      <input 
+                                                          type="checkbox" 
+                                                          className="rounded h-5 w-5 mt-1"
+                                                          checked={selectedPOs.has(po.id)}
+                                                          onChange={() => handleSelectPO(po.id)}
+                                                      />
+                                                    )}
+                                                    <div>
+                                                      <span className="text-sm text-gray-500 dark:text-gray-400">سفارش #{po.id}</span>
+                                                      <p className="font-semibold">{po.supplier?.fullname || 'نامشخص'}</p>
+                                                      <p className="font-semibold text-sm text-gray-600 dark:text-gray-300">{po.demand?.customer?.fullname || 'مشتری نامشخص'}</p>
+                                                      <p className="text-xs text-gray-400 mt-1">درخواست #{po.demandid}</p>
+                                                    </div>
+                                                </div>
+                                              </div>
+                                              <p className="text-sm flex-shrink-0">{new Date(po.created_at).toLocaleDateString('fa-IR')}</p>
+                                          </div>
+                                          <div className="mb-3">
+                                               <label className="text-xs text-gray-500 dark:text-gray-400">وضعیت</label>
+                                               <select value={po.status} onChange={(e) => handleUpdateStatus(po.id, e.target.value)} className={`w-full rounded-md p-2 mt-1 border text-sm ${getStatusStyles(po.status)}`}>
+                                                   {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                               </select>
+                                          </div>
+                                          <div className="mb-3">
+                                              <div className="flex justify-between items-center">
+                                                  <span className="text-sm text-gray-500 dark:text-gray-400">جمع محصولات</span>
+                                                  <p className="font-semibold">{formatCurrency(po.subtotal)} تومان</p>
+                                              </div>
+                                              <div className="flex justify-between items-center mt-1">
+                                                  <span className="text-sm text-gray-500 dark:text-gray-400">هزینه حمل واقعی</span>
+                                                  <p className="font-semibold">{formatCurrency(po.actual_shipping_cost || 0)} تومان</p>
+                                              </div>
+                                          </div>
+                                          <div className="flex justify-between items-center mb-3 pt-2 border-t dark:border-gray-600">
+                                              <span className="text-sm text-gray-500 dark:text-gray-400">مبلغ کل نهایی</span>
+                                              <p className="font-bold text-lg">{formatCurrency(po.totalAmount)} تومان</p>
+                                          </div>
+                                          <div className="flex justify-end gap-4 border-t dark:border-gray-600 pt-3">
+                                              <button onClick={() => setEditingPO(po)} disabled={po.status !== 'Pending Approval'} className="text-yellow-500 text-sm font-semibold disabled:text-gray-400">ویرایش</button>
+                                              <button onClick={() => setViewingPO(po)} className="text-indigo-500 text-sm font-semibold">جزئیات</button>
+                                              <button onClick={() => setPrintingPO(po)} className="text-green-500 text-sm font-semibold">چاپ</button>
+                                          </div>
+                                      </div>
+                                  ))}
+                             </div>
+                              {displayedPOs.length === 0 && (
+                                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                      </svg>
+                                      <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">هیچ سفارشی یافت نشد</h3>
+                                      <p className="mt-1 text-sm">با تغییر فیلترها یا عبارت جستجو دوباره امتحان کنید.</p>
+                                  </div>
+                              )}
+                         </div>
                     )}
                      {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} />}
                      {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} />}
                      {printingPO && <PrintablePOModal po={printingPO} onClose={() => setPrintingPO(null)} />}
+                     {showMergeConfirm && <MergeConfirmationModal mergeInfo={mergeInfo} onCancel={() => setShowMergeConfirm(false)} onConfirm={handleConfirmMerge} isMerging={isMerging} />}
                 </div>
             );
         };
