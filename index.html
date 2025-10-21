@@ -297,29 +297,29 @@
                             <div className="font-bold sm:col-span-2 text-base"><span className="font-semibold">مبلغ کل نهایی:</span> {formatCurrency(po.totalAmount)} تومان</div>
                         </div>
                         <div className="overflow-x-auto border-t pt-4">
-                             <table className="w-full text-right text-sm">
-                                 <thead>
-                                     <tr className="border-b dark:border-gray-700">
-                                         <th className="p-2">محصول</th>
-                                         <th className="p-2">تعداد</th>
-                                         <th className="p-2">قیمت خرید</th>
-                                         <th className="p-2">جمع کل</th>
-                                     </tr>
-                                 </thead>
-                                 <tbody>
-                                     {po.purchase_order_details.map(detail => {
-                                         const lineTotal = detail.quantity * detail.purchase_price;
-                                         return (
-                                             <tr key={detail.id} className="border-b dark:border-gray-700 last:border-b-0">
-                                                 <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
-                                                 <td className="p-2">{detail.quantity}</td>
-                                                 <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
-                                                 <td className="p-2">{formatCurrency(lineTotal)}</td>
-                                             </tr>
-                                         );
-                                     })}
-                                 </tbody>
-                             </table>
+                            <table className="w-full text-right text-sm">
+                                <thead>
+                                    <tr className="border-b dark:border-gray-700">
+                                        <th className="p-2">محصول</th>
+                                        <th className="p-2">تعداد</th>
+                                        <th className="p-2">قیمت خرید</th>
+                                        <th className="p-2">جمع کل</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {po.purchase_order_details.map(detail => {
+                                        const lineTotal = detail.quantity * detail.purchase_price;
+                                        return (
+                                            <tr key={detail.id} className="border-b dark:border-gray-700 last:border-b-0">
+                                                <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                                <td className="p-2">{detail.quantity}</td>
+                                                <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
+                                                <td className="p-2">{formatCurrency(lineTotal)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </Modal>
@@ -335,21 +335,21 @@
             const showToast = useToast();
 
              React.useEffect(() => {
-                 const fetchSuppliers = async () => {
-                     // Filter for suppliers with roleid = 3, as requested and fixed
-                     const { data, error } = await supabaseClient
-                         .from('profiles')
-                         .select('id, fullname')
-                         .eq('roleid', 3);
-                         
-                     if (error) {
-                         console.error('Error fetching suppliers:', error);
-                         showToast('خطا در دریافت لیست تامین کنندگان', 'error');
-                     } else {
-                         setSuppliersList(data);
-                     }
-                 };
-                 fetchSuppliers();
+                  const fetchSuppliers = async () => {
+                       // Filter for suppliers with roleid = 3, as requested and fixed
+                       const { data, error } = await supabaseClient
+                           .from('profiles')
+                           .select('id, fullname')
+                           .eq('roleid', 3);
+                           
+                       if (error) {
+                           console.error('Error fetching suppliers:', error);
+                           showToast('خطا در دریافت لیست تامین کنندگان', 'error');
+                       } else {
+                           setSuppliersList(data);
+                       }
+                  };
+                  fetchSuppliers();
              }, [showToast]);
 
             const handleDetailChange = (index, field, value) => {
@@ -473,28 +473,28 @@
                             </div>
                         </section>
                         <section className="py-4">
-                             <table className="w-full text-right text-sm">
-                                 <thead className="bg-gray-100">
-                                     <tr>
-                                         <th className="p-2 font-semibold">ش</th>
-                                         <th className="p-2 font-semibold">شرح محصول</th>
-                                         <th className="p-2 font-semibold">تعداد</th>
-                                         <th className="p-2 font-semibold">قیمت واحد</th>
-                                         <th className="p-2 font-semibold">جمع کل</th>
-                                     </tr>
-                                 </thead>
-                                 <tbody>
-                                     {po.purchase_order_details.map((detail, index) => (
-                                         <tr key={detail.id} className="border-b">
-                                             <td className="p-2">{index + 1}</td>
-                                             <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
-                                             <td className="p-2">{detail.quantity}</td>
-                                             <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
-                                             <td className="p-2">{formatCurrency(detail.quantity * detail.purchase_price)}</td>
-                                         </tr>
-                                     ))}
-                                 </tbody>
-                             </table>
+                            <table className="w-full text-right text-sm">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="p-2 font-semibold">ش</th>
+                                        <th className="p-2 font-semibold">شرح محصول</th>
+                                        <th className="p-2 font-semibold">تعداد</th>
+                                        <th className="p-2 font-semibold">قیمت واحد</th>
+                                        <th className="p-2 font-semibold">جمع کل</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {po.purchase_order_details.map((detail, index) => (
+                                        <tr key={detail.id} className="border-b">
+                                            <td className="p-2">{index + 1}</td>
+                                            <td className="p-2">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                            <td className="p-2">{detail.quantity}</td>
+                                            <td className="p-2">{formatCurrency(detail.purchase_price)}</td>
+                                            <td className="p-2">{formatCurrency(detail.quantity * detail.purchase_price)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </section>
                          <footer className="pt-4 border-t">
                             <div className="flex justify-end">
@@ -548,6 +548,51 @@
             );
         };
 
+        const StatusConfirmationModal = ({ updateInfo, onConfirm, onCancel, isUpdating }) => {
+            if (!updateInfo) return null;
+
+            const { oldStatus, newStatus } = updateInfo;
+
+            return (
+                <Modal isOpen={!!updateInfo} onClose={onCancel} title="تایید تغییر وضعیت">
+                    <div className="space-y-4">
+                        <p>
+                            آیا از تغییر وضعیت سفارش
+                            <span className="font-bold mx-1 font-mono">#{updateInfo.poId}</span>
+                            اطمینان دارید؟
+                        </p>
+                        <div className="flex items-center justify-center gap-4 text-center my-4">
+                            <span className={`px-3 py-1 text-sm font-semibold rounded-md border ${getStatusStyles(oldStatus)}`}>
+                                {oldStatus}
+                            </span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                            <span className={`px-3 py-1 text-sm font-semibold rounded-md border ${getStatusStyles(newStatus)}`}>
+                                {newStatus}
+                            </span>
+                        </div>
+                        {newStatus === 'Cancelled' && (
+                            <p className="text-sm text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 p-3 rounded-lg">
+                                توجه: کنسل کردن سفارش یک عملیات نهایی است و ممکن است پیامدهایی برای درخواست مشتری مرتبط داشته باشد.
+                            </p>
+                        )}
+                        {newStatus === 'Fulfilled' && (
+                            <p className="text-sm text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 p-3 rounded-lg">
+                            توجه: با تکمیل کردن این سفارش، مراحل بعدی برای تسویه حساب با تامین کننده فعال خواهد شد.
+                            </p>
+                        )}
+                        <div className="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <button onClick={onCancel} disabled={isUpdating} className="bg-gray-200 dark:bg-gray-600 py-2 px-4 rounded-lg">انصراف</button>
+                            <button onClick={onConfirm} disabled={isUpdating} className="bg-indigo-600 text-white py-2 px-4 rounded-lg disabled:bg-indigo-400">
+                                {isUpdating ? 'در حال بروزرسانی...' : 'بله، تغییر بده'}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            );
+        };
+
 
         const PurchaseOrderManagement = () => {
             const [purchaseOrders, setPurchaseOrders] = React.useState([]);
@@ -561,7 +606,25 @@
             const [selectedPOs, setSelectedPOs] = React.useState(new Set());
             const [showMergeConfirm, setShowMergeConfirm] = React.useState(false);
             const [isMerging, setIsMerging] = React.useState(false);
+            const [statusUpdateInfo, setStatusUpdateInfo] = React.useState(null); // { poId, newStatus, oldStatus }
+            const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+            const [sortConfig, setSortConfig] = React.useState({ key: 'created_at', direction: 'descending' });
             const showToast = useToast();
+
+            const requestSort = (key) => {
+                let direction = 'ascending';
+                if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+                    direction = 'descending';
+                }
+                setSortConfig({ key, direction });
+            };
+
+            const getSortIcon = (name) => {
+                if (sortConfig.key !== name) {
+                    return null;
+                }
+                return sortConfig.direction === 'ascending' ? '▲' : '▼';
+            };
 
             const fetchData = React.useCallback(async () => {
                 setIsLoading(true);
@@ -694,26 +757,29 @@
                 setSelectedPOs(newSelection);
             };
 
-            const handleUpdateStatus = async (poId, newStatus) => {
-                const poToUpdate = purchaseOrders.find(po => po.id === poId);
-                if (!poToUpdate) return;
-                
+            const executeStatusUpdate = async () => {
+                if (!statusUpdateInfo) return;
+                const { poId, newStatus, oldStatus } = statusUpdateInfo;
+            
+                setIsUpdatingStatus(true);
                 // Optimistic UI update
-                setPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? {...po, status: newStatus} : po));
-
+                setPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: newStatus } : po));
+                setStatusUpdateInfo(null); // Close modal
+            
                 const { error: updateError } = await supabaseClient
                     .from('purchase_orders')
                     .update({ status: newStatus })
                     .eq('id', poId);
-                
+            
                 if (updateError) {
                     console.error("Error updating status:", updateError);
                     // Revert on error
-                    setPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? {...po, status: poToUpdate.status} : po));
+                    setPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: oldStatus } : po));
                     showToast(`خطا در بروزرسانی وضعیت: ${updateError.message}`, 'error');
                 } else {
                     showToast('وضعیت با موفقیت بروزرسانی شد.');
                 }
+                setIsUpdatingStatus(false);
             };
 
             const handleSavePO = async (poId, updatedDetails, actualShippingCost, supplierId) => {
@@ -826,15 +892,47 @@
             };
             
             const displayedPOs = React.useMemo(() => {
-                if (!searchTerm) return purchaseOrders;
+                let sortableItems = [...purchaseOrders];
+        
+                if (sortConfig.key) {
+                    sortableItems.sort((a, b) => {
+                        const aValue = a[sortConfig.key];
+                        const bValue = b[sortConfig.key];
+
+                        if (aValue === null || aValue === undefined) return 1;
+                        if (bValue === null || bValue === undefined) return -1;
+                        
+                        // Special case for date strings
+                        if (sortConfig.key === 'created_at') {
+                            const dateA = new Date(aValue);
+                            const dateB = new Date(bValue);
+                            if (dateA < dateB) return sortConfig.direction === 'ascending' ? -1 : 1;
+                            if (dateA > dateB) return sortConfig.direction === 'ascending' ? 1 : -1;
+                            return 0;
+                        }
+
+                        if (aValue < bValue) {
+                            return sortConfig.direction === 'ascending' ? -1 : 1;
+                        }
+                        if (aValue > bValue) {
+                            return sortConfig.direction === 'ascending' ? 1 : -1;
+                        }
+                        return 0;
+                    });
+                }
+
+                if (!searchTerm) {
+                    return sortableItems;
+                }
+                
                 const lowercasedFilter = searchTerm.toLowerCase();
-                return purchaseOrders.filter(po => 
+                return sortableItems.filter(po => 
                     po.id.toString().includes(lowercasedFilter) ||
-                    po.demandid.toString().includes(lowercasedFilter) ||
+                    (po.demandid && po.demandid.toString().includes(lowercasedFilter)) ||
                     (po.supplier?.fullname && po.supplier.fullname.toLowerCase().includes(lowercasedFilter)) ||
                     (po.demand?.customer?.fullname && po.demand.customer.fullname.toLowerCase().includes(lowercasedFilter))
                 );
-            }, [purchaseOrders, searchTerm]);
+            }, [purchaseOrders, searchTerm, sortConfig]);
 
             return (
                  <div className="p-4 md:p-8 text-gray-900 dark:text-gray-100 min-h-screen">
@@ -883,16 +981,24 @@
                                  <table className="w-full text-right">
                                      <thead>
                                          <tr className="border-b dark:border-gray-700">
-                                            <th className="p-3 font-semibold w-12 text-center">
-                                                <input type="checkbox" className="rounded" disabled />
-                                            </th>
-                                             <th className="p-3 font-semibold">شماره PO</th>
-                                             <th className="p-3 font-semibold">شماره درخواست</th>
+                                             <th className="p-3 font-semibold w-12 text-center">
+                                                 <input type="checkbox" className="rounded" disabled />
+                                             </th>
+                                             <th className="p-3 font-semibold cursor-pointer" onClick={() => requestSort('id')}>
+                                                <div className="flex items-center gap-1">شماره PO <span className="text-xs">{getSortIcon('id')}</span></div>
+                                             </th>
+                                             <th className="p-3 font-semibold cursor-pointer" onClick={() => requestSort('demandid')}>
+                                                <div className="flex items-center gap-1">شماره درخواست <span className="text-xs">{getSortIcon('demandid')}</span></div>
+                                             </th>
                                              <th className="p-3 font-semibold">تامین کننده</th>
                                              <th className="p-3 font-semibold">نام مشتری</th>
-                                             <th className="p-3 font-semibold">تاریخ</th>
+                                             <th className="p-3 font-semibold cursor-pointer" onClick={() => requestSort('created_at')}>
+                                                <div className="flex items-center gap-1">تاریخ <span className="text-xs">{getSortIcon('created_at')}</span></div>
+                                             </th>
                                              <th className="p-3 font-semibold">هزینه حمل واقعی</th>
-                                             <th className="p-3 font-semibold">مبلغ کل نهایی</th>
+                                             <th className="p-3 font-semibold cursor-pointer" onClick={() => requestSort('totalAmount')}>
+                                                <div className="flex items-center gap-1">مبلغ کل نهایی <span className="text-xs">{getSortIcon('totalAmount')}</span></div>
+                                             </th>
                                              <th className="p-3 font-semibold">وضعیت</th>
                                              <th className="p-3 font-semibold">عملیات</th>
                                          </tr>
@@ -902,12 +1008,12 @@
                                              <tr key={po.id} className="border-b dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
                                                  <td className="p-3 text-center">
                                                      {po.status === 'Pending Approval' && (
-                                                        <input 
-                                                            type="checkbox" 
-                                                            className="rounded" 
-                                                            checked={selectedPOs.has(po.id)}
-                                                            onChange={() => handleSelectPO(po.id)}
-                                                        />
+                                                         <input 
+                                                             type="checkbox" 
+                                                             className="rounded" 
+                                                             checked={selectedPOs.has(po.id)}
+                                                             onChange={() => handleSelectPO(po.id)}
+                                                         />
                                                      )}
                                                  </td>
                                                  <td className="p-3 font-mono">#{po.id}</td>
@@ -918,7 +1024,15 @@
                                                  <td className="p-3 font-semibold">{formatCurrency(po.actual_shipping_cost || 0)}</td>
                                                  <td className="p-3 font-semibold">{formatCurrency(po.totalAmount)}</td>
                                                  <td className="p-3">
-                                                     <select value={po.status} onChange={(e) => handleUpdateStatus(po.id, e.target.value)} className={`rounded-md p-1 border text-sm w-full ${getStatusStyles(po.status)}`}>
+                                                      <select
+                                                        value={po.status}
+                                                        onChange={(e) => {
+                                                            if (e.target.value !== po.status) {
+                                                                setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
+                                                            }
+                                                        }}
+                                                        className={`rounded-md p-1 border text-sm w-full ${getStatusStyles(po.status)}`}
+                                                    >
                                                          {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                                                      </select>
                                                  </td>
@@ -958,10 +1072,18 @@
                                               <p className="text-sm flex-shrink-0">{new Date(po.created_at).toLocaleDateString('fa-IR')}</p>
                                           </div>
                                           <div className="mb-3">
-                                               <label className="text-xs text-gray-500 dark:text-gray-400">وضعیت</label>
-                                               <select value={po.status} onChange={(e) => handleUpdateStatus(po.id, e.target.value)} className={`w-full rounded-md p-2 mt-1 border text-sm ${getStatusStyles(po.status)}`}>
-                                                   {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                                               </select>
+                                              <label className="text-xs text-gray-500 dark:text-gray-400">وضعیت</label>
+                                              <select
+                                                value={po.status}
+                                                onChange={(e) => {
+                                                    if (e.target.value !== po.status) {
+                                                        setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
+                                                    }
+                                                }}
+                                                className={`w-full rounded-md p-2 mt-1 border text-sm ${getStatusStyles(po.status)}`}
+                                              >
+                                                  {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                              </select>
                                           </div>
                                           <div className="mb-3">
                                               <div className="flex justify-between items-center">
@@ -985,21 +1107,22 @@
                                       </div>
                                   ))}
                              </div>
-                              {displayedPOs.length === 0 && (
-                                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                      </svg>
-                                      <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">هیچ سفارشی یافت نشد</h3>
-                                      <p className="mt-1 text-sm">با تغییر فیلترها یا عبارت جستجو دوباره امتحان کنید.</p>
-                                  </div>
-                              )}
+                             {displayedPOs.length === 0 && (
+                                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                     <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                     </svg>
+                                     <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">هیچ سفارشی یافت نشد</h3>
+                                     <p className="mt-1 text-sm">با تغییر فیلترها یا عبارت جستجو دوباره امتحان کنید.</p>
+                                 </div>
+                             )}
                          </div>
                     )}
                      {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} />}
                      {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} />}
                      {printingPO && <PrintablePOModal po={printingPO} onClose={() => setPrintingPO(null)} />}
                      {showMergeConfirm && <MergeConfirmationModal mergeInfo={mergeInfo} onCancel={() => setShowMergeConfirm(false)} onConfirm={handleConfirmMerge} isMerging={isMerging} />}
+                     <StatusConfirmationModal updateInfo={statusUpdateInfo} onCancel={() => setStatusUpdateInfo(null)} onConfirm={executeStatusUpdate} isUpdating={isUpdatingStatus} />
                 </div>
             );
         };
