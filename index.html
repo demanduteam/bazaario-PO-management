@@ -140,6 +140,19 @@
             }
         };
 
+        // Helper for Demand Status Styles
+        const getDemandStatusStyles = (status) => {
+            // Assuming status names from demandstatustype table
+            // You might need to adjust these strings if they are different in your table
+            switch (status) {
+                case 'Pending': return 'bg-yellow-100 dark:bg-yellow-900/60 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700';
+                case 'In Progress': return 'bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-700';
+                case 'Completed': return 'bg-green-100 dark:bg-green-900/60 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-700';
+                case 'Cancelled': return 'bg-red-100 dark:bg-red-900/60 text-red-800 dark:text-red-200 border border-red-300 dark:border-red-700';
+                default: return 'bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600';
+            }
+        };
+
         // ==================================================
         // Toast Notification System
         // ==================================================
@@ -177,10 +190,10 @@
                 <div className="modal-overlay" onClick={onClose}>
                     <div className="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" onClick={e => e.stopPropagation()}>
                         {showHeader && (
-                             <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200 dark:border-gray-600">
-                                 <h2 className="text-xl font-bold">{title}</h2>
-                                 <button onClick={onClose} className="text-gray-400 hover:text-gray-800 dark:hover:text-white text-2xl">&times;</button>
-                             </div>
+                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200 dark:border-gray-600">
+                                <h2 className="text-xl font-bold">{title}</h2>
+                                <button onClick={onClose} className="text-gray-400 hover:text-gray-800 dark:hover:text-white text-2xl">&times;</button>
+                            </div>
                         )}
                         {children}
                     </div>
@@ -335,21 +348,21 @@
             const showToast = useToast();
 
              React.useEffect(() => {
-                  const fetchSuppliers = async () => {
-                       // Filter for suppliers with roleid = 3, as requested and fixed
-                       const { data, error } = await supabaseClient
-                           .from('profiles')
-                           .select('id, fullname')
-                           .eq('roleid', 3);
-                           
-                       if (error) {
-                           console.error('Error fetching suppliers:', error);
-                           showToast('خطا در دریافت لیست تامین کنندگان', 'error');
-                       } else {
-                           setSuppliersList(data);
-                       }
-                  };
-                  fetchSuppliers();
+                 const fetchSuppliers = async () => {
+                     // Filter for suppliers with roleid = 3, as requested and fixed
+                     const { data, error } = await supabaseClient
+                         .from('profiles')
+                         .select('id, fullname')
+                         .eq('roleid', 3);
+                         
+                     if (error) {
+                         console.error('Error fetching suppliers:', error);
+                         showToast('خطا در دریافت لیست تامین کنندگان', 'error');
+                     } else {
+                         setSuppliersList(data);
+                     }
+                 };
+                 fetchSuppliers();
              }, [showToast]);
 
             const handleDetailChange = (index, field, value) => {
@@ -377,7 +390,7 @@
                     <div className="space-y-4">
                          <div className="mb-4 pb-4 border-b dark:border-gray-700">
                              <label htmlFor="supplier-select" className="font-semibold text-sm">تغییر تامین کننده:</label>
-                              <SearchableDropdown
+                             <SearchableDropdown
                                  options={suppliersList}
                                  value={selectedSupplierId}
                                  onChange={setSelectedSupplierId}
@@ -464,7 +477,7 @@
                                 <p><span className="font-semibold">آدرس:</span> {`${po.supplier?.location?.address || '--'} ${po.supplier?.location?.plaque ? `پلاک ${po.supplier.location.plaque}` : ''}`.trim()}</p>
                                 <p><span className="font-semibold">کدپستی:</span> {po.supplier?.location?.postalcode || '--'}</p>
                             </div>
-                             <div>
+                           <div>
                                 <h2 className="font-bold mb-2">خریدار</h2>
                                 <p><span className="font-semibold">نام:</span> {myCompanyProfile?.fullname || '...'}</p>
                                 <p><span className="font-semibold">کد اقتصادی:</span> {myCompanyProfile?.national_id || '--'}</p>
@@ -579,13 +592,13 @@
                         )}
                         {newStatus === 'Fulfilled' && (
                             <p className="text-sm text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 p-3 rounded-lg">
-                            توجه: با تکمیل کردن این سفارش، مراحل بعدی برای تسویه حساب با تامین کننده فعال خواهد شد.
+                                توجه: با تکمیل کردن این سفارش، مراحل بعدی برای تسویه حساب با تامین کننده فعال خواهد شد.
                             </p>
                         )}
                         <div className="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <button onClick={onCancel} disabled={isUpdating} className="bg-gray-200 dark:bg-gray-600 py-2 px-4 rounded-lg">انصراف</button>
                             <button onClick={onConfirm} disabled={isUpdating} className="bg-indigo-600 text-white py-2 px-4 rounded-lg disabled:bg-indigo-400">
-                                {isUpdating ? 'در حال بروزرسانی...' : 'بله، تغییر بده'}
+                                {isUpdating ? 'در حال بروزRSانی...' : 'بله، تغییر بده'}
                             </button>
                         </div>
                     </div>
@@ -595,7 +608,7 @@
 
 
         const PurchaseOrderManagement = () => {
-            const [purchaseOrders, setPurchaseOrders] = React.useState([]);
+            const [allPurchaseOrders, setAllPurchaseOrders] = React.useState([]);
             const [isLoading, setIsLoading] = React.useState(true);
             const [error, setError] = React.useState('');
             const [viewingPO, setViewingPO] = React.useState(null);
@@ -603,10 +616,16 @@
             const [printingPO, setPrintingPO] = React.useState(null);
             const [statusFilter, setStatusFilter] = React.useState('All');
             const [searchTerm, setSearchTerm] = React.useState('');
+            const [startDate, setStartDate] = React.useState('');
+            const [endDate, setEndDate] = React.useState('');
+            
+            // NEW: State for hiding cancelled demands, defaulting to true
+            const [hideCancelled, setHideCancelled] = React.useState(true);
+
             const [selectedPOs, setSelectedPOs] = React.useState(new Set());
             const [showMergeConfirm, setShowMergeConfirm] = React.useState(false);
             const [isMerging, setIsMerging] = React.useState(false);
-            const [statusUpdateInfo, setStatusUpdateInfo] = React.useState(null); // { poId, newStatus, oldStatus }
+            const [statusUpdateInfo, setStatusUpdateInfo] = React.useState(null); 
             const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
             const [sortConfig, setSortConfig] = React.useState({ key: 'created_at', direction: 'descending' });
             const showToast = useToast();
@@ -630,7 +649,6 @@
                 setIsLoading(true);
                 setError('');
                 try {
-                    // Base query for purchase orders
                     let poQuery = supabaseClient
                         .from('purchase_orders')
                         .select(`
@@ -638,54 +656,62 @@
                             supplier:supplier_id(fullname, mobile, location:locationid(postalcode, address, plaque)),
                             purchase_order_details(
                                 id, quantity, purchase_price, demand_item_id,
-                                demand_item:demand_item_id(product:productid(title))
+                                demand_item:demand_item_id(
+                                    product:productid(title),
+                                    demandstatusid
+                                )
                             )
                         `);
 
-                    // Apply status filter
-                    if (statusFilter !== 'All') {
-                        poQuery = poQuery.eq('status', statusFilter);
-                    }
-                    
                     const { data: pos, error: poError } = await poQuery.order('created_at', { ascending: false });
 
                     if (poError) throw poError;
                     
-                    // If no results, exit early
                     if (!pos || pos.length === 0) {
-                        setPurchaseOrders([]);
+                        setAllPurchaseOrders([]); 
                         setIsLoading(false);
                         return;
                     }
 
-                    // Collect unique demand IDs from the fetched POs
                     const demandIds = [...new Set(pos.map(po => po.demandid).filter(Boolean))];
 
                     if (demandIds.length === 0) {
-                        // No linked demands, process as is
                         const processedData = pos.map(po => {
                             const subtotal = po.purchase_order_details.reduce((sum, detail) => sum + (detail.quantity * detail.purchase_price), 0);
                             return { ...po, subtotal, totalAmount: subtotal + (po.actual_shipping_cost || 0) };
                         });
-                        setPurchaseOrders(processedData);
+                        setAllPurchaseOrders(processedData); 
                         setIsLoading(false);
                         return;
                     }
 
-                    // Fetch related demands
                     const { data: demands, error: demandError } = await supabaseClient
                         .from('demand')
-                        .select('id, customeruserid')
+                        .select('id, customeruserid') 
                         .in('id', demandIds);
                     
                     if (demandError) throw demandError;
+
+                    // *** FIX START ***
+                    // 1. Fetch all possible demand status types
+                    const { data: statusTypes, error: statusTypesError } = await supabaseClient
+                        .from('demandstatustype')
+                        .select('id, main_status'); // *** FIX: Using the correct 'main_status' column
+
+                    if (statusTypesError) throw statusTypesError;
+
+                    // 2. Create a lookup map for status types (e.g., 12 -> "Pending")
+                    const statusTypeMap = new Map(statusTypes.map(st => [st.id, st.main_status])); // *** FIX: Using 'st.main_status'
+                    // *** FIX END ***
+
+                    // 3. Fetch latest demand status IDs from the separate table/view - REMOVED
                     
-                    // Collect unique customer IDs
+                    // 4. Create a lookup map for statuses - REMOVED
+                    
                     const customerIds = [...new Set(demands.map(d => d.customeruserid).filter(Boolean))];
 
                     let customersMap = new Map();
                     if (customerIds.length > 0) {
-                        // Fetch related customers (profiles)
                         const { data: customers, error: customerError } = await supabaseClient
                             .from('profiles')
                             .select('id, fullname')
@@ -695,24 +721,37 @@
                         customersMap = new Map(customers.map(c => [c.id, c]));
                     }
 
-                    // Create a lookup map for demands, injecting customer info
                     const demandsMap = new Map(demands.map(d => [d.id, { 
                         ...d, 
-                        customer: customersMap.get(d.customeruserid) 
+                        customer: customersMap.get(d.customeruserid)
+                        // Removed status from here, as it will be derived from items
                     }]));
 
-                    // Stitch all data together
                     const processedData = pos.map(po => {
                         const subtotal = po.purchase_order_details.reduce((sum, detail) => sum + (detail.quantity * detail.purchase_price), 0);
+                        
+                        // Get base customer info from the map
+                        const demandInfo = demandsMap.get(po.demandid);
+                        
+                        // --- New Status Logic ---
+                        // Find the status from the first demand item in this PO
+                        const firstDetail = po.purchase_order_details?.[0];
+                        const statusId = firstDetail?.demand_item?.demandstatusid;
+                        const statusString = statusTypeMap.get(statusId) || '---';
+                        // --- End New Logic ---
+
                         return {
                             ...po,
-                            demand: demandsMap.get(po.demandid),
+                            demand: { // Re-create the demand object
+                                ...demandInfo, // Spread customer info etc.
+                                status: statusString // Add the status we just found
+                            },
                             subtotal,
                             totalAmount: subtotal + (po.actual_shipping_cost || 0)
                         };
                     });
                     
-                    setPurchaseOrders(processedData);
+                    setAllPurchaseOrders(processedData); 
 
                 } catch (err) {
                     console.error("Error fetching purchase orders:", err);
@@ -720,15 +759,66 @@
                 } finally {
                     setIsLoading(false);
                 }
-            }, [statusFilter]);
+            }, []); 
             
             React.useEffect(() => {
                 fetchData();
             }, [fetchData]);
 
+            const summaryData = React.useMemo(() => {
+                const counts = {
+                    'Pending Approval': 0,
+                    'Sent to Supplier': 0,
+                    'Partially Fulfilled': 0,
+                    'Fulfilled': 0,
+                    'Cancelled': 0,
+                    'Merged': 0,
+                };
+                for (const po of allPurchaseOrders) {
+                    if (counts.hasOwnProperty(po.status)) {
+                        counts[po.status]++;
+                    }
+                }
+                return counts;
+            }, [allPurchaseOrders]);
+
+            // Memoized list after status, date, and NEW cancelled demand filters
+            const filteredPOs = React.useMemo(() => {
+                let items = [...allPurchaseOrders];
+
+                // NEW: Filter for cancelled demands
+                if (hideCancelled) {
+                    // Assuming 'Cancelled' is the exact string from the demandstatustype table
+                    items = items.filter(po => po.demand?.status !== 'Cancelled');
+                }
+
+                // Status Filter
+                if (statusFilter !== 'All') {
+                    items = items.filter(po => po.status === statusFilter);
+                }
+
+                // Date Range Filter
+                const start = startDate ? new Date(startDate) : null;
+                const end = endDate ? new Date(endDate) : null;
+                
+                if (start) start.setHours(0, 0, 0, 0); // Normalize to start of day
+                if (end) end.setHours(23, 59, 59, 999); // Normalize to end of day
+
+                if (start || end) {
+                    items = items.filter(po => {
+                        const poDate = new Date(po.created_at);
+                        const afterStart = !start || poDate >= start;
+                        const beforeEnd = !end || poDate <= end;
+                        return afterStart && beforeEnd;
+                    });
+                }
+                
+                return items;
+            }, [allPurchaseOrders, statusFilter, startDate, endDate, hideCancelled]); // NEW: Added hideCancelled dependency
+
             const mergeInfo = React.useMemo(() => {
                 if (selectedPOs.size < 2) return { possible: false };
-                const posToMerge = purchaseOrders.filter(po => selectedPOs.has(po.id));
+                const posToMerge = allPurchaseOrders.filter(po => selectedPOs.has(po.id));
                 if (posToMerge.length !== selectedPOs.size) return { possible: false };
 
                 const firstSupplierId = posToMerge[0]?.supplier_id;
@@ -745,7 +835,7 @@
                     };
                 }
                 return { possible: false };
-            }, [selectedPOs, purchaseOrders]);
+            }, [selectedPOs, allPurchaseOrders]); 
 
             const handleSelectPO = (poId) => {
                 const newSelection = new Set(selectedPOs);
@@ -762,9 +852,8 @@
                 const { poId, newStatus, oldStatus } = statusUpdateInfo;
             
                 setIsUpdatingStatus(true);
-                // Optimistic UI update
-                setPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: newStatus } : po));
-                setStatusUpdateInfo(null); // Close modal
+                setAllPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: newStatus } : po));
+                setStatusUpdateInfo(null); 
             
                 const { error: updateError } = await supabaseClient
                     .from('purchase_orders')
@@ -773,8 +862,7 @@
             
                 if (updateError) {
                     console.error("Error updating status:", updateError);
-                    // Revert on error
-                    setPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: oldStatus } : po));
+                    setAllPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: oldStatus } : po));
                     showToast(`خطا در بروزرسانی وضعیت: ${updateError.message}`, 'error');
                 } else {
                     showToast('وضعیت با موفقیت بروزرسانی شد.');
@@ -809,10 +897,10 @@
                     
                     showToast('سفارش خرید با موفقیت بروزرسانی شد.');
                     setEditingPO(null);
-                    fetchData(); // Refresh data to show changes
+                    fetchData(); 
                 } catch(err) {
                     console.error("Error saving PO:", err);
-                    throw err; // Re-throw to be caught in EditPOModal
+                    throw err; 
                 }
             };
 
@@ -823,7 +911,6 @@
                 }
                 setIsMerging(true);
                 try {
-                    // 1. Aggregate items
                     const mergedItems = new Map();
                     mergeInfo.poObjects.forEach(po => {
                         po.purchase_order_details.forEach(detail => {
@@ -837,13 +924,11 @@
                         });
                     });
                     
-                    // 2. Create the new merged PO
                     const { data: newPO, error: newPOError } = await supabaseClient
                         .from('purchase_orders')
                         .insert({
                             supplier_id: mergeInfo.supplierId,
                             status: 'Pending Approval',
-                            // Inherit demandid and invoiceid from the first PO
                             demandid: mergeInfo.poObjects[0].demandid,
                             demandinvoice_id: mergeInfo.poObjects[0].demandinvoice_id,
                         })
@@ -852,7 +937,6 @@
 
                     if (newPOError) throw newPOError;
 
-                    // 3. Create the new aggregated details
                     const newDetails = Array.from(mergedItems.values()).map(item => ({
                         purchase_order_id: newPO.id,
                         demand_item_id: item.demand_item_id,
@@ -865,12 +949,10 @@
                         .insert(newDetails);
                     
                     if (newDetailsError) {
-                        // Cleanup attempt: delete the PO we just created
                         await supabaseClient.from('purchase_orders').delete().eq('id', newPO.id);
                         throw newDetailsError;
                     }
 
-                    // 4. Update the old POs to 'Merged'
                     const oldPoIds = mergeInfo.poObjects.map(po => po.id);
                     const { error: updateOldError } = await supabaseClient
                         .from('purchase_orders')
@@ -887,12 +969,12 @@
                     setIsMerging(false);
                     setShowMergeConfirm(false);
                     setSelectedPOs(new Set());
-                    fetchData(); // Refresh list
+                    fetchData(); 
                 }
             };
             
             const displayedPOs = React.useMemo(() => {
-                let sortableItems = [...purchaseOrders];
+                let sortableItems = [...filteredPOs];
         
                 if (sortConfig.key) {
                     sortableItems.sort((a, b) => {
@@ -902,7 +984,6 @@
                         if (aValue === null || aValue === undefined) return 1;
                         if (bValue === null || bValue === undefined) return -1;
                         
-                        // Special case for date strings
                         if (sortConfig.key === 'created_at') {
                             const dateA = new Date(aValue);
                             const dateB = new Date(bValue);
@@ -930,51 +1011,117 @@
                     po.id.toString().includes(lowercasedFilter) ||
                     (po.demandid && po.demandid.toString().includes(lowercasedFilter)) ||
                     (po.supplier?.fullname && po.supplier.fullname.toLowerCase().includes(lowercasedFilter)) ||
-                    (po.demand?.customer?.fullname && po.demand.customer.fullname.toLowerCase().includes(lowercasedFilter))
+                    (po.demand?.customer?.fullname && po.demand.customer.fullname.toLowerCase().includes(lowercasedFilter)) ||
+                    (po.demand?.status && po.demand.status.toLowerCase().includes(lowercasedFilter)) 
                 );
-            }, [purchaseOrders, searchTerm, sortConfig]);
+            }, [filteredPOs, searchTerm, sortConfig]); 
 
             return (
                  <div className="p-4 md:p-8 text-gray-900 dark:text-gray-100 min-h-screen">
-                    <header className="mb-8">
-                        <h1 className="text-3xl font-bold">مدیریت سفارشات خرید (PO)</h1>
-                        <p className="text-gray-500 dark:text-gray-400 mt-1">سفارشات ارسال شده به تامین کنندگان را پیگیری کنید.</p>
-                    </header>
+                     <header className="mb-8">
+                         <h1 className="text-3xl font-bold">مدیریت سفارشات خرید (PO)</h1>
+                         <p className="text-gray-500 dark:text-gray-400 mt-1">سفارشات ارسال شده به تامین کنندگان را پیگیری کنید.</p>
+                     </header>
 
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-8 flex flex-col md:flex-row gap-4 items-end">
-                         <div className="flex-grow">
-                            <label htmlFor="status-filter" className="block text-sm font-medium mb-1">فیلتر بر اساس وضعیت:</label>
-                            <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600">
-                                <option value="All">همه وضعیت ها</option>
-                                {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                            </select>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border-r-4 border-yellow-500 dark:border-yellow-400">
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">در انتظار تایید</div>
+                            <div className="mt-1 text-3xl font-semibold">{summaryData['Pending Approval'] || 0}</div>
                         </div>
-                        <div className="flex-grow">
-                            <label htmlFor="search-filter" className="block text-sm font-medium mb-1">جستجو:</label>
-                            <input 
-                                id="search-filter"
-                                type="text"
-                                placeholder="شماره PO، شماره درخواست، نام تامین کننده، نام مشتری..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600"
-                            />
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border-r-4 border-blue-500 dark:border-blue-400">
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">ارسال به تامین‌کننده</div>
+                            <div className="mt-1 text-3xl font-semibold">{summaryData['Sent to Supplier'] || 0}</div>
                         </div>
-                        <div className="flex-shrink-0">
-                             <button 
-                                onClick={() => setShowMergeConfirm(true)}
-                                disabled={!mergeInfo.possible}
-                                className="w-full md:w-auto bg-green-600 text-white py-2 px-4 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                             >
-                                 ادغام ({selectedPOs.size}) سفارش
-                             </button>
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border-r-4 border-purple-500 dark:border-purple-400">
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">تکمیل ناقص</div>
+                            <div className="mt-1 text-3xl font-semibold">{summaryData['Partially Fulfilled'] || 0}</div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border-r-4 border-green-500 dark:border-green-400">
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">تکمیل شده</div>
+                            <div className="mt-1 text-3xl font-semibold">{summaryData['Fulfilled'] || 0}</div>
+                        </div>
+                     </div>
+
+                     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Row 1: Filters */}
+                            <div>
+                                <label htmlFor="status-filter" className="block text-sm font-medium mb-1">فیلتر بر اساس وضعیت:</label>
+                                <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600">
+                                    <option value="All">همه وضعیت ها</option>
+                                    {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="start-date" className="block text-sm font-medium mb-1">از تاریخ:</label>
+                                <input 
+                                    id="start-date" 
+                                    type="date" 
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600" 
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="end-date" className="block text-sm font-medium mb-1">تا تاریخ:</label>
+                                <input 
+                                    id="end-date" 
+                                    type="date" 
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600" 
+                                />
+                            </div>
+                            <div className="self-end">
+                                <button
+                                    onClick={() => { setStartDate(''); setEndDate(''); }}
+                                    className="w-full bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors"
+                                >
+                                    پاک کردن تاریخ
+                                </button>
+                            </div>
+
+                            {/* Row 2: Search & Merge */}
+                            <div className="md:col-span-2">
+                                <label htmlFor="search-filter" className="block text-sm font-medium mb-1">جستجو:</label>
+                                <input 
+                                    id="search-filter"
+                                    type="text"
+                                    placeholder="شماره PO، شماره تقاضا، نام تامین کننده، نام مشتری..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600"
+                                />
+                            </div>
+                            {/* NEW: Checkbox to hide cancelled demands */}
+                            <div className="self-end flex items-center justify-start">
+                                <input 
+                                    type="checkbox"
+                                    id="hide-cancelled"
+                                    checked={hideCancelled}
+                                    onChange={(e) => setHideCancelled(e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 ml-2"
+                                />
+                                <label htmlFor="hide-cancelled" className="text-sm font-medium">
+                                    مخفی کردن تقاضاهای لغو شده
+                                </label>
+                            </div>
+                            <div className="self-end">
+                                <button 
+                                    onClick={() => setShowMergeConfirm(true)}
+                                    disabled={!mergeInfo.possible}
+                                    className="w-full bg-green-600 text-white py-2 px-4 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    ادغام ({selectedPOs.size}) سفارش
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    {isLoading && <div className="spinner"></div>}
-                    {error && <p className="text-center p-8 text-red-500 bg-red-100 dark:bg-red-900/50 rounded-lg">{error}</p>}
-                    
-                    {!isLoading && !error && (
+                     {isLoading && <div className="spinner"></div>}
+                     {error && <p className="text-center p-8 text-red-500 bg-red-100 dark:bg-red-900/50 rounded-lg">{error}</p>}
+                     
+                     {!isLoading && !error && (
                          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
                              {/* Desktop Table */}
                              <div className="hidden md:block overflow-x-auto">
@@ -985,19 +1132,20 @@
                                                  <input type="checkbox" className="rounded" disabled />
                                              </th>
                                              <th className="p-3 font-semibold cursor-pointer" onClick={() => requestSort('id')}>
-                                                <div className="flex items-center gap-1">شماره PO <span className="text-xs">{getSortIcon('id')}</span></div>
+                                                 <div className="flex items-center gap-1">شماره PO <span className="text-xs">{getSortIcon('id')}</span></div>
                                              </th>
                                              <th className="p-3 font-semibold cursor-pointer" onClick={() => requestSort('demandid')}>
-                                                <div className="flex items-center gap-1">شماره درخواست <span className="text-xs">{getSortIcon('demandid')}</span></div>
+                                                 <div className="flex items-center gap-1">شماره تقاضا <span className="text-xs">{getSortIcon('demandid')}</span></div>
                                              </th>
+                                             <th className="p-3 font-semibold">وضعیت تقاضا</th>
                                              <th className="p-3 font-semibold">تامین کننده</th>
                                              <th className="p-3 font-semibold">نام مشتری</th>
                                              <th className="p-3 font-semibold cursor-pointer" onClick={() => requestSort('created_at')}>
-                                                <div className="flex items-center gap-1">تاریخ <span className="text-xs">{getSortIcon('created_at')}</span></div>
+                                                 <div className="flex items-center gap-1">تاریخ <span className="text-xs">{getSortIcon('created_at')}</span></div>
                                              </th>
                                              <th className="p-3 font-semibold">هزینه حمل واقعی</th>
                                              <th className="p-3 font-semibold cursor-pointer" onClick={() => requestSort('totalAmount')}>
-                                                <div className="flex items-center gap-1">مبلغ کل نهایی <span className="text-xs">{getSortIcon('totalAmount')}</span></div>
+                                                 <div className="flex items-center gap-1">مبلغ کل نهایی <span className="text-xs">{getSortIcon('totalAmount')}</span></div>
                                              </th>
                                              <th className="p-3 font-semibold">وضعیت</th>
                                              <th className="p-3 font-semibold">عملیات</th>
@@ -1018,6 +1166,11 @@
                                                  </td>
                                                  <td className="p-3 font-mono">#{po.id}</td>
                                                  <td className="p-3 font-mono">#{po.demandid}</td>
+                                                 <td className="p-3">
+                                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDemandStatusStyles(po.demand?.status)}`}>
+                                                        {po.demand?.status || '---'}
+                                                    </span>
+                                                 </td>
                                                  <td className="p-3">{po.supplier?.fullname || 'نامشخص'}</td>
                                                  <td className="p-3">{po.demand?.customer?.fullname || 'نامشخص'}</td>
                                                  <td className="p-3">{new Date(po.created_at).toLocaleDateString('fa-IR')}</td>
@@ -1025,14 +1178,14 @@
                                                  <td className="p-3 font-semibold">{formatCurrency(po.totalAmount)}</td>
                                                  <td className="p-3">
                                                       <select
-                                                        value={po.status}
-                                                        onChange={(e) => {
-                                                            if (e.target.value !== po.status) {
-                                                                setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
-                                                            }
-                                                        }}
-                                                        className={`rounded-md p-1 border text-sm w-full ${getStatusStyles(po.status)}`}
-                                                    >
+                                                         value={po.status}
+                                                         onChange={(e) => {
+                                                             if (e.target.value !== po.status) {
+                                                                 setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
+                                                             }
+                                                         }}
+                                                         className={`rounded-md p-1 border text-sm w-full ${getStatusStyles(po.status)}`}
+                                                     >
                                                          {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                                                      </select>
                                                  </td>
@@ -1052,35 +1205,40 @@
                                       <div key={po.id} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg shadow">
                                           <div className="flex justify-between items-start mb-3 pb-3 border-b dark:border-gray-600">
                                               <div>
-                                                <div className="flex items-start gap-3">
-                                                    {po.status === 'Pending Approval' && (
-                                                      <input 
-                                                          type="checkbox" 
-                                                          className="rounded h-5 w-5 mt-1"
-                                                          checked={selectedPOs.has(po.id)}
-                                                          onChange={() => handleSelectPO(po.id)}
-                                                      />
-                                                    )}
-                                                    <div>
-                                                      <span className="text-sm text-gray-500 dark:text-gray-400">سفارش #{po.id}</span>
-                                                      <p className="font-semibold">{po.supplier?.fullname || 'نامشخص'}</p>
-                                                      <p className="font-semibold text-sm text-gray-600 dark:text-gray-300">{po.demand?.customer?.fullname || 'مشتری نامشخص'}</p>
-                                                      <p className="text-xs text-gray-400 mt-1">درخواست #{po.demandid}</p>
-                                                    </div>
-                                                </div>
+                                                  <div className="flex items-start gap-3">
+                                                      {po.status === 'Pending Approval' && (
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="rounded h-5 w-5 mt-1"
+                                                            checked={selectedPOs.has(po.id)}
+                                                            onChange={() => handleSelectPO(po.id)}
+                                                        />
+                                                      )}
+                                                      <div>
+                                                          <span className="text-sm text-gray-500 dark:text-gray-400">سفارش #{po.id}</span>
+                                                          <p className="font-semibold">{po.supplier?.fullname || 'نامشخص'}</p>
+                                                          <p className="font-semibold text-sm text-gray-600 dark:text-gray-300">{po.demand?.customer?.fullname || 'مشتری نامشخص'}</p>
+                                                          <div className="flex items-center gap-2 mt-1">
+                                                            <p className="text-xs text-gray-400">درخواست #{po.demandid}</p>
+                                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${getDemandStatusStyles(po.demand?.status)}`}>
+                                                                {po.demand?.status || '---'}
+                                                            </span>
+                                                          </div>
+                                                      </div>
+                                                  </div>
                                               </div>
                                               <p className="text-sm flex-shrink-0">{new Date(po.created_at).toLocaleDateString('fa-IR')}</p>
                                           </div>
                                           <div className="mb-3">
                                               <label className="text-xs text-gray-500 dark:text-gray-400">وضعیت</label>
                                               <select
-                                                value={po.status}
-                                                onChange={(e) => {
-                                                    if (e.target.value !== po.status) {
-                                                        setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
-                                                    }
-                                                }}
-                                                className={`w-full rounded-md p-2 mt-1 border text-sm ${getStatusStyles(po.status)}`}
+                                                  value={po.status}
+                                                  onChange={(e) => {
+                                                      if (e.target.value !== po.status) {
+                                                          setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
+                                                      }
+                                                  }}
+                                                  className={`w-full rounded-md p-2 mt-1 border text-sm ${getStatusStyles(po.status)}`}
                                               >
                                                   {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                                               </select>
@@ -1110,20 +1268,20 @@
                              {displayedPOs.length === 0 && (
                                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                                      </svg>
                                      <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">هیچ سفارشی یافت نشد</h3>
                                      <p className="mt-1 text-sm">با تغییر فیلترها یا عبارت جستجو دوباره امتحان کنید.</p>
                                  </div>
                              )}
                          </div>
-                    )}
-                     {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} />}
-                     {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} />}
-                     {printingPO && <PrintablePOModal po={printingPO} onClose={() => setPrintingPO(null)} />}
-                     {showMergeConfirm && <MergeConfirmationModal mergeInfo={mergeInfo} onCancel={() => setShowMergeConfirm(false)} onConfirm={handleConfirmMerge} isMerging={isMerging} />}
-                     <StatusConfirmationModal updateInfo={statusUpdateInfo} onCancel={() => setStatusUpdateInfo(null)} onConfirm={executeStatusUpdate} isUpdating={isUpdatingStatus} />
-                </div>
+                     )}
+                       {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} />}
+                       {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} />}
+                       {printingPO && <PrintablePOModal po={printingPO} onClose={() => setPrintingPO(null)} />}
+                       {showMergeConfirm && <MergeConfirmationModal mergeInfo={mergeInfo} onCancel={() => setShowMergeConfirm(false)} onConfirm={handleConfirmMerge} isMerging={isMerging} />}
+                       <StatusConfirmationModal updateInfo={statusUpdateInfo} onCancel={() => setStatusUpdateInfo(null)} onConfirm={executeStatusUpdate} isUpdating={isUpdatingStatus} />
+                 </div>
             );
         };
 
@@ -1139,4 +1297,3 @@
     </script>
 </body>
 </html>
-
