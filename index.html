@@ -372,8 +372,12 @@
                                 <span>جمع محصولات:</span>
                                 <span>{formatCurrency(po.subtotal)} تومان</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span>هزینه حمل واقعی:</span>
+                            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                                <span>هزینه حمل مشتری (فاکتور):</span>
+                                <span>{formatCurrency(po.customerShippingCost)} تومان</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-medium text-gray-800 dark:text-gray-200">
+                                <span>هزینه حمل واقعی (پرداختی ما):</span>
                                 <span>{formatCurrency(po.actual_shipping_cost || 0)} تومان</span>
                             </div>
                             <div className="flex justify-between font-bold text-lg text-indigo-700 dark:text-indigo-300 pt-2 border-t border-indigo-200 dark:border-indigo-800">
@@ -771,7 +775,10 @@
 
                     // Fetch customer info even if no demand items (edge case)
                     let customersMap = new Map();
+                    let invoicesMap = new Map(); // New Map for Invoices
+
                     if (demandIds.length > 0) {
+                         // 1. Fetch Demands
                          const { data: demands, error: demandError } = await supabaseClient
                             .from('demand')
                             .select('id, customeruserid') 
@@ -779,6 +786,7 @@
                         
                          if (demandError) throw demandError;
 
+                         // 2. Fetch Customers
                          const customerIds = [...new Set(demands.map(d => d.customeruserid).filter(Boolean))];
                          if(customerIds.length > 0) {
                             const { data: customers, error: customerError } = await supabaseClient
@@ -787,16 +795,27 @@
                                 .in('id', customerIds);
                             
                             if (customerError) throw customerError;
-                             // Helper map to go from customeruserid -> customer profile
                             const profileMap = new Map(customers.map(c => [c.id, c]));
                             
-                            // Map demandID -> customer info
                             demands.forEach(d => {
                                 customersMap.set(d.id, { 
                                     ...d, 
                                     customer: profileMap.get(d.customeruserid) 
                                 });
                             });
+                         }
+
+                         // 3. Fetch Invoices manually using demand_id (Fix for missing FKs)
+                         const { data: invoices, error: invoiceError } = await supabaseClient
+                            .from('demandinvoice')
+                            .select('demandid, totalshippingprice')
+                            .in('demandid', demandIds)
+                            .eq('isdeleted', false); // Best practice to exclude deleted invoices
+
+                         if (!invoiceError && invoices) {
+                             invoices.forEach(inv => {
+                                 invoicesMap.set(inv.demandid, inv.totalshippingprice);
+                             });
                          }
                     }
 
@@ -815,6 +834,7 @@
                         
                         // Get base customer info from the map
                         const demandInfo = customersMap.get(po.demandid);
+                        const customerShippingCost = invoicesMap.get(po.demandid) || 0; // Get from map
                         
                         // --- Status Logic ---
                         // Find the status from the first demand item in this PO
@@ -824,10 +844,13 @@
 
                         return {
                             ...po,
+                            // FIX: Trim whitespace and default to 'باید بخرم' if null/empty to ensure counters work
+                            status: po.status ? po.status.trim() : 'باید بخرم', 
                             demand: { 
                                 ...demandInfo, 
                                 status: statusString 
                             },
+                            customerShippingCost: customerShippingCost, // Store for UI
                             subtotal,
                             totalAmount: subtotal + (po.actual_shipping_cost || 0)
                         };
@@ -1265,6 +1288,7 @@
                                              <th className="p-4 font-semibold cursor-pointer hover:text-indigo-500 transition-colors" onClick={() => requestSort('created_at')}>
                                                  <div className="flex items-center gap-1">تاریخ <span className="text-xs">{getSortIcon('created_at')}</span></div>
                                              </th>
+                                             <th className="p-4 font-semibold text-center">هزینه حمل مشتری</th>
                                              <th className="p-4 font-semibold text-center">هزینه حمل واقعی</th>
                                              <th className="p-4 font-semibold cursor-pointer hover:text-indigo-500 transition-colors" onClick={() => requestSort('totalAmount')}>
                                                  <div className="flex items-center gap-1">مبلغ کل <span className="text-xs">{getSortIcon('totalAmount')}</span></div>
@@ -1296,6 +1320,7 @@
                                                  <td className="p-4 font-medium">{po.supplier?.fullname || 'نامشخص'}</td>
                                                  <td className="p-4 text-gray-600 dark:text-gray-300">{po.demand?.customer?.fullname || 'نامشخص'}</td>
                                                  <td className="p-4 text-gray-500">{new Date(po.created_at).toLocaleDateString('fa-IR')}</td>
+                                                 <td className="p-4 font-mono text-center text-gray-600 dark:text-gray-400">{formatCurrency(po.customerShippingCost)}</td>
                                                  <td className="p-4 font-mono text-center text-gray-600 dark:text-gray-400">{formatCurrency(po.actual_shipping_cost || 0)}</td>
                                                  <td className="p-4 font-bold text-gray-800 dark:text-gray-200">{formatCurrency(po.totalAmount)}</td>
                                                  <td className="p-4">
@@ -1367,7 +1392,11 @@
                                                   <span className="font-medium">{formatCurrency(po.subtotal)}</span>
                                               </div>
                                               <div className="flex justify-between items-center text-sm">
-                                                  <span className="text-gray-500 dark:text-gray-400">هزینه حمل:</span>
+                                                  <span className="text-gray-500 dark:text-gray-400">هزینه حمل مشتری:</span>
+                                                  <span className="font-medium">{formatCurrency(po.customerShippingCost)}</span>
+                                              </div>
+                                              <div className="flex justify-between items-center text-sm">
+                                                  <span className="text-gray-500 dark:text-gray-400">هزینه حمل واقعی:</span>
                                                   <span className="font-medium">{formatCurrency(po.actual_shipping_cost || 0)}</span>
                                               </div>
                                               <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
