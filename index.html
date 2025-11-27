@@ -124,7 +124,15 @@
         const { createClient } = supabase;
         const supabaseUrl = 'https://wehyjatotbzxargnxasg.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHlqYXRvdGJ6eGFyZ254YXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MTIwMjEsImV4cCI6MjA2NzQ4ODAyMX0.2R448DuEBlTrNvaYXiYZ8D5M7MJNv7n1qmIDHQBNFiY';
-        const supabaseClient = createClient(supabaseUrl, supabaseKey, { global: { fetch: window.fetch.bind(window) } });
+        
+        const supabaseClient = createClient(supabaseUrl, supabaseKey, { 
+            auth: {
+                persistSession: false
+            },
+            global: { 
+                fetch: window.fetch.bind(window) 
+            } 
+        });
 
         // ==================================================
         // Helper Functions & Constants
@@ -148,8 +156,7 @@
             return Number(String(value).replace(/,/g, '')) || 0;
         };
         
-        // RENAMED STATUSES HERE
-        const PO_STATUSES = ['باید بخرم', 'خریداری شد', 'تحویل بازوی ارسال شد', 'تحویل مشتری شد', 'Cancelled', 'Merged'];
+        const PO_STATUSES = ['باید بخرم', 'خریداری شد', 'تحویل بازوی ارسال شد', 'تحویل مشتری شد', 'محاسبه سود و زیان انجام شد', 'Cancelled', 'Merged'];
         const MY_COMPANY_PROFILE_ID = 'f83dca6b-9bc3-4bc2-8ac0-609a4147269b';
 
         const getStatusStyles = (status) => {
@@ -158,13 +165,13 @@
                 case 'خریداری شد': return 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700';
                 case 'تحویل بازوی ارسال شد': return 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700';
                 case 'تحویل مشتری شد': return 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700';
+                case 'محاسبه سود و زیان انجام شد': return 'bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700';
                 case 'Cancelled': return 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700';
                 case 'Merged': return 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-400 dark:border-gray-600';
                 default: return 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600';
             }
         };
 
-        // Helper for Demand Status Styles
         const getDemandStatusStyles = (status) => {
             switch (status) {
                 case 'Pending': return 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700';
@@ -334,7 +341,8 @@
                                     <thead className="bg-gray-100 dark:bg-gray-700">
                                         <tr>
                                             <th className="p-3 font-semibold">محصول</th>
-                                            <th className="p-3 font-semibold">تعداد</th>
+                                            <th className="p-3 font-semibold text-center text-gray-500">تعداد درخواستی مشتری</th>
+                                            <th className="p-3 font-semibold text-center">تعداد خرید</th>
                                             <th className="p-3 font-semibold">قیمت خرید</th>
                                             <th className="p-3 font-semibold">جمع کل</th>
                                         </tr>
@@ -345,7 +353,10 @@
                                             return (
                                                 <tr key={detail.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                     <td className="p-3">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
-                                                    <td className="p-3">{detail.quantity}</td>
+                                                    <td className="p-3 text-center text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-gray-800/50">
+                                                        {detail.demand_item?.quantity || '-'}
+                                                    </td>
+                                                    <td className="p-3 text-center font-medium">{detail.quantity}</td>
                                                     <td className="p-3 text-gray-600 dark:text-gray-300">{formatCurrency(detail.purchase_price)}</td>
                                                     <td className="p-3 font-medium">{formatCurrency(lineTotal)}</td>
                                                 </tr>
@@ -435,14 +446,27 @@
                         <div className="overflow-x-auto rounded-lg border dark:border-gray-700">
                             <table className="w-full text-right text-sm">
                                 <thead className="bg-gray-100 dark:bg-gray-700">
-                                    <tr><th className="p-3">محصول</th><th className="p-3 w-24">تعداد</th><th className="p-3 w-40">قیمت خرید</th></tr>
+                                    <tr>
+                                        <th className="p-3">محصول</th>
+                                        <th className="p-3 w-32 text-center text-gray-500">تعداد درخواستی مشتری</th>
+                                        <th className="p-3 w-24 text-center font-bold">تعداد خرید</th>
+                                        <th className="p-3 w-40">قیمت خرید</th>
+                                    </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                     {details.map((detail, index) => (
                                         <tr key={detail.id}>
                                             <td className="p-3 text-gray-700 dark:text-gray-300">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                            <td className="p-3 text-center text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-gray-800/50">
+                                                {detail.demand_item?.quantity || '-'}
+                                            </td>
                                             <td className="p-3">
-                                                <input type="number" value={detail.quantity} onChange={(e) => handleDetailChange(index, 'quantity', e.target.value)} className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 p-2 rounded-md text-center focus:ring-2 focus:ring-indigo-500 outline-none"/>
+                                                <input 
+                                                    type="number" 
+                                                    value={detail.quantity} 
+                                                    onChange={(e) => handleDetailChange(index, 'quantity', e.target.value)} 
+                                                    className="w-full bg-white dark:bg-gray-800 border border-indigo-300 dark:border-indigo-700 p-2 rounded-md text-center font-bold focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
+                                                />
                                             </td>
                                             <td className="p-3">
                                                 <input type="text" value={formatNumberWithCommas(detail.purchase_price)} onChange={(e) => handleDetailChange(index, 'purchase_price', parseFormattedNumber(e.target.value))} className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 p-2 rounded-md text-center focus:ring-2 focus:ring-indigo-500 outline-none"/>
@@ -727,7 +751,8 @@
                                 id, quantity, purchase_price, demand_item_id,
                                 demand_item:demand_item_id(
                                     product:productid(title),
-                                    demandstatusid
+                                    demandstatusid,
+                                    quantity
                                 )
                             )
                         `);
@@ -752,7 +777,7 @@
                             .select('id, customeruserid') 
                             .in('id', demandIds);
                         
-                        if (demandError) throw demandError;
+                         if (demandError) throw demandError;
 
                          const customerIds = [...new Set(demands.map(d => d.customeruserid).filter(Boolean))];
                          if(customerIds.length > 0) {
@@ -828,6 +853,7 @@
                     'خریداری شد': 0,
                     'تحویل بازوی ارسال شد': 0,
                     'تحویل مشتری شد': 0,
+                    'محاسبه سود و زیان انجام شد': 0,
                     'Cancelled': 0,
                     'Merged': 0,
                 };
@@ -921,6 +947,12 @@
                     setAllPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: oldStatus } : po));
                     showToast(`خطا در بروزرسانی وضعیت: ${updateError.message}`, 'error');
                 } else {
+                    // Log the change
+                    await supabaseClient.from('purchase_order_logs').insert({
+                        purchase_order_id: poId,
+                        previous_status: oldStatus,
+                        new_status: newStatus
+                    });
                     showToast('وضعیت با موفقیت بروزرسانی شد.');
                 }
                 setIsUpdatingStatus(false);
@@ -1017,6 +1049,14 @@
                     
                     if (updateOldError) throw updateOldError;
 
+                    // Log changes for all merged POs
+                    const logEntries = oldPoIds.map(id => ({
+                        purchase_order_id: id,
+                        previous_status: 'باید بخرم', // We know they were 'باید بخرم' based on merge logic
+                        new_status: 'Merged'
+                    }));
+                    await supabaseClient.from('purchase_order_logs').insert(logEntries);
+
                     showToast(`سفارشات با موفقیت در سفارش جدید #${newPO.id} ادغام شدند.`);
                 } catch(err) {
                     console.error("Error during merge:", err);
@@ -1088,7 +1128,7 @@
                          </div>
                      </header>
 
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                         <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-yellow-500 dark:border-yellow-400">
                             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">باید بخرم</div>
                             <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['باید بخرم'] || 0}</div>
@@ -1104,6 +1144,10 @@
                         <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-green-500 dark:border-green-400">
                             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">تحویل مشتری شد</div>
                             <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['تحویل مشتری شد'] || 0}</div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-teal-500 dark:border-teal-400">
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">محاسبه سود و زیان</div>
+                            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['محاسبه سود و زیان انجام شد'] || 0}</div>
                         </div>
                      </div>
 
@@ -1221,7 +1265,7 @@
                                              <th className="p-4 font-semibold cursor-pointer hover:text-indigo-500 transition-colors" onClick={() => requestSort('created_at')}>
                                                  <div className="flex items-center gap-1">تاریخ <span className="text-xs">{getSortIcon('created_at')}</span></div>
                                              </th>
-                                             <th className="p-4 font-semibold text-center">حمل (تومان)</th>
+                                             <th className="p-4 font-semibold text-center">هزینه حمل واقعی</th>
                                              <th className="p-4 font-semibold cursor-pointer hover:text-indigo-500 transition-colors" onClick={() => requestSort('totalAmount')}>
                                                  <div className="flex items-center gap-1">مبلغ کل <span className="text-xs">{getSortIcon('totalAmount')}</span></div>
                                              </th>
@@ -1269,7 +1313,7 @@
                                                  </td>
                                                  <td className="p-4">
                                                      <div className="flex items-center justify-center gap-2">
-                                                        <button onClick={() => setEditingPO(po)} disabled={po.status !== 'باید بخرم'} className="text-yellow-600 dark:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="ویرایش">
+                                                        <button onClick={() => setEditingPO(po)} className="text-yellow-600 dark:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 p-1.5 rounded-lg transition-colors" title="ویرایش">
                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                                         </button>
                                                         <button onClick={() => setViewingPO(po)} className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 p-1.5 rounded-lg transition-colors" title="جزئیات">
@@ -1346,7 +1390,7 @@
                                               </select>
                                               
                                               <div className="grid grid-cols-3 gap-2">
-                                                  <button onClick={() => setEditingPO(po)} disabled={po.status !== 'باید بخرم'} className="flex items-center justify-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+                                                  <button onClick={() => setEditingPO(po)} className="flex items-center justify-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 py-2 rounded-lg text-sm font-medium">
                                                       <span>ویرایش</span>
                                                   </button>
                                                   <button onClick={() => setViewingPO(po)} className="flex items-center justify-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 py-2 rounded-lg text-sm font-medium">
