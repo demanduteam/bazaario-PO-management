@@ -329,7 +329,7 @@
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6 text-sm bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
                             <div><span className="text-gray-500 dark:text-gray-400">تامین کننده:</span> <span className="font-semibold block text-base">{po.supplier?.fullname || 'نامشخص'}</span></div>
                             <div><span className="text-gray-500 dark:text-gray-400">تاریخ ایجاد:</span> <span className="font-semibold block text-base">{new Date(po.created_at).toLocaleDateString('fa-IR')}</span></div>
-                            <div><span className="text-gray-500 dark:text-gray-400">فاکتور مشتری:</span> <span className="font-mono block">#{po.demandinvoice_id || '---'}</span></div>
+                            <div><span className="text-gray-500 dark:text-gray-400">فاکتور مشتری:</span> <span className="font-mono block">#{po.realInvoiceId || '---'}</span></div>
                             <div><span className="text-gray-500 dark:text-gray-400">شماره درخواست:</span> <span className="font-mono block">#{po.demandid || '---'}</span></div>
                             <div className="sm:col-span-2"><span className="text-gray-500 dark:text-gray-400">مشتری:</span> <span className="font-semibold block text-base">{po.demand?.customer?.fullname || 'نامشخص'}</span></div>
                         </div>
@@ -529,93 +529,95 @@
 
             return (
                 <Modal isOpen={!!po} onClose={onClose} showHeader={false}>
-                    <div id="printable-po" className="bg-white text-black p-8 font-vazir min-h-[297mm]">
-                        <header className="flex justify-between items-start pb-6 border-b-2 border-gray-800 mb-6">
-                            <div>
-                                <h1 className="text-3xl font-bold mb-2">سفارش خرید (Purchase Order)</h1>
-                                <div className="text-sm space-y-1">
-                                    <p>شماره سفارش: <span className="font-mono font-bold text-lg">{po.id}</span></p>
-                                    <p>تاریخ: {new Date(po.created_at).toLocaleDateString('fa-IR')}</p>
+                    <>
+                        <div id="printable-po" className="bg-white text-black p-8 font-vazir min-h-[297mm]">
+                            <header className="flex justify-between items-start pb-6 border-b-2 border-gray-800 mb-6">
+                                <div>
+                                    <h1 className="text-3xl font-bold mb-2">سفارش خرید (Purchase Order)</h1>
+                                    <div className="text-sm space-y-1">
+                                        <p>شماره سفارش: <span className="font-mono font-bold text-lg">{po.id}</span></p>
+                                        <p>تاریخ: {new Date(po.created_at).toLocaleDateString('fa-IR')}</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="text-left">
-                                <h2 className="text-xl font-bold text-gray-600">{myCompanyProfile?.fullname || 'شرکت ما'}</h2>
-                            </div>
-                        </header>
-                        <section className="grid grid-cols-2 gap-12 mb-8 text-sm">
+                                <div className="text-left">
+                                    <h2 className="text-xl font-bold text-gray-600">{myCompanyProfile?.fullname || 'شرکت ما'}</h2>
+                                </div>
+                            </header>
+                            <section className="grid grid-cols-2 gap-12 mb-8 text-sm">
+                                <div className="border p-4 rounded-lg">
+                                    <h2 className="font-bold text-base mb-3 border-b pb-2 bg-gray-50 -mx-4 -mt-4 px-4 py-2 rounded-t-lg">مشخصات فروشنده (تامین کننده)</h2>
+                                    <div className="space-y-2">
+                                        <p><span className="font-semibold w-24 inline-block">نام:</span> {po.supplier?.fullname || '...'}</p>
+                                        <p><span className="font-semibold w-24 inline-block">شماره تماس:</span> {po.supplier?.mobile || '--'}</p>
+                                        <p><span className="font-semibold w-24 inline-block">آدرس:</span> {`${po.supplier?.location?.address || '--'} ${po.supplier?.location?.plaque ? `پلاک ${po.supplier.location.plaque}` : ''}`.trim()}</p>
+                                        <p><span className="font-semibold w-24 inline-block">کدپستی:</span> {po.supplier?.location?.postalcode || '--'}</p>
+                                    </div>
+                                </div>
                             <div className="border p-4 rounded-lg">
-                                <h2 className="font-bold text-base mb-3 border-b pb-2 bg-gray-50 -mx-4 -mt-4 px-4 py-2 rounded-t-lg">مشخصات فروشنده (تامین کننده)</h2>
-                                <div className="space-y-2">
-                                    <p><span className="font-semibold w-24 inline-block">نام:</span> {po.supplier?.fullname || '...'}</p>
-                                    <p><span className="font-semibold w-24 inline-block">شماره تماس:</span> {po.supplier?.mobile || '--'}</p>
-                                    <p><span className="font-semibold w-24 inline-block">آدرس:</span> {`${po.supplier?.location?.address || '--'} ${po.supplier?.location?.plaque ? `پلاک ${po.supplier.location.plaque}` : ''}`.trim()}</p>
-                                    <p><span className="font-semibold w-24 inline-block">کدپستی:</span> {po.supplier?.location?.postalcode || '--'}</p>
+                                    <h2 className="font-bold text-base mb-3 border-b pb-2 bg-gray-50 -mx-4 -mt-4 px-4 py-2 rounded-t-lg">مشخصات خریدار</h2>
+                                    <div className="space-y-2">
+                                        <p><span className="font-semibold w-24 inline-block">نام:</span> {myCompanyProfile?.fullname || '...'}</p>
+                                        <p><span className="font-semibold w-24 inline-block">کد اقتصادی:</span> {myCompanyProfile?.national_id || '--'}</p>
+                                        <p><span className="font-semibold w-24 inline-block">شماره تماس:</span> {myCompanyProfile?.mobile || '--'}</p>
+                                        <p><span className="font-semibold w-24 inline-block">آدرس:</span> {`${myCompanyProfile?.location?.address || '--'} ${myCompanyProfile?.location?.plaque ? `پلاک ${myCompanyProfile.location.plaque}` : ''}`.trim()}</p>
+                                    </div>
                                 </div>
-                            </div>
-                           <div className="border p-4 rounded-lg">
-                                <h2 className="font-bold text-base mb-3 border-b pb-2 bg-gray-50 -mx-4 -mt-4 px-4 py-2 rounded-t-lg">مشخصات خریدار</h2>
-                                <div className="space-y-2">
-                                    <p><span className="font-semibold w-24 inline-block">نام:</span> {myCompanyProfile?.fullname || '...'}</p>
-                                    <p><span className="font-semibold w-24 inline-block">کد اقتصادی:</span> {myCompanyProfile?.national_id || '--'}</p>
-                                    <p><span className="font-semibold w-24 inline-block">شماره تماس:</span> {myCompanyProfile?.mobile || '--'}</p>
-                                    <p><span className="font-semibold w-24 inline-block">آدرس:</span> {`${myCompanyProfile?.location?.address || '--'} ${myCompanyProfile?.location?.plaque ? `پلاک ${myCompanyProfile.location.plaque}` : ''}`.trim()}</p>
-                                </div>
-                            </div>
-                        </section>
-                        <section className="mb-8">
-                            <table className="w-full text-right text-sm border-collapse border border-gray-300">
-                                <thead className="bg-gray-100">
-                                    <tr>
-                                        <th className="p-3 border border-gray-300 font-bold w-12 text-center">#</th>
-                                        <th className="p-3 border border-gray-300 font-bold">شرح محصول</th>
-                                        <th className="p-3 border border-gray-300 font-bold w-24 text-center">تعداد</th>
-                                        <th className="p-3 border border-gray-300 font-bold w-32">قیمت واحد (تومان)</th>
-                                        <th className="p-3 border border-gray-300 font-bold w-40">جمع کل (تومان)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {po.purchase_order_details.map((detail, index) => (
-                                        <tr key={detail.id}>
-                                            <td className="p-3 border border-gray-300 text-center">{index + 1}</td>
-                                            <td className="p-3 border border-gray-300">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
-                                            <td className="p-3 border border-gray-300 text-center">{detail.quantity}</td>
-                                            <td className="p-3 border border-gray-300">{formatCurrency(detail.purchase_price)}</td>
-                                            <td className="p-3 border border-gray-300 font-medium">{formatCurrency(detail.quantity * detail.purchase_price)}</td>
+                            </section>
+                            <section className="mb-8">
+                                <table className="w-full text-right text-sm border-collapse border border-gray-300">
+                                    <thead className="bg-gray-100">
+                                        <tr>
+                                            <th className="p-3 border border-gray-300 font-bold w-12 text-center">#</th>
+                                            <th className="p-3 border border-gray-300 font-bold">شرح محصول</th>
+                                            <th className="p-3 border border-gray-300 font-bold w-24 text-center">تعداد</th>
+                                            <th className="p-3 border border-gray-300 font-bold w-32">قیمت واحد (تومان)</th>
+                                            <th className="p-3 border border-gray-300 font-bold w-40">جمع کل (تومان)</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </section>
-                         <footer>
-                            <div className="flex justify-end">
-                                <div className="text-left space-y-2 text-sm w-1/2 max-w-xs border p-4 rounded-lg bg-gray-50">
-                                    <div className="flex justify-between gap-4">
-                                        <span>جمع محصولات:</span>
-                                        <span>{formatCurrency(po.subtotal)}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span>هزینه حمل واقعی:</span>
-                                        <span>{formatCurrency(po.actual_shipping_cost || 0)}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4 font-bold text-lg border-t border-gray-300 pt-3 mt-2">
-                                        <span>جمع کل سفارش:</span>
-                                        <span>{formatCurrency(po.totalAmount)} تومان</span>
+                                    </thead>
+                                    <tbody>
+                                        {po.purchase_order_details.map((detail, index) => (
+                                            <tr key={detail.id}>
+                                                <td className="p-3 border border-gray-300 text-center">{index + 1}</td>
+                                                <td className="p-3 border border-gray-300">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
+                                                <td className="p-3 border border-gray-300 text-center">{detail.quantity}</td>
+                                                <td className="p-3 border border-gray-300">{formatCurrency(detail.purchase_price)}</td>
+                                                <td className="p-3 border border-gray-300 font-medium">{formatCurrency(detail.quantity * detail.purchase_price)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </section>
+                            <footer>
+                                <div className="flex justify-end">
+                                    <div className="text-left space-y-2 text-sm w-1/2 max-w-xs border p-4 rounded-lg bg-gray-50">
+                                        <div className="flex justify-between gap-4">
+                                            <span>جمع محصولات:</span>
+                                            <span>{formatCurrency(po.subtotal)}</span>
+                                        </div>
+                                        <div className="flex justify-between gap-4">
+                                            <span>هزینه حمل واقعی:</span>
+                                            <span>{formatCurrency(po.actual_shipping_cost || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between gap-4 font-bold text-lg border-t border-gray-300 pt-3 mt-2">
+                                            <span>جمع کل سفارش:</span>
+                                            <span>{formatCurrency(po.totalAmount)} تومان</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="mt-12 flex justify-between px-8 text-sm text-gray-500">
-                                <div>مهر و امضای فروشنده</div>
-                                <div>مهر و امضای خریدار</div>
-                            </div>
-                        </footer>
-                    </div>
-                    <div className="flex justify-end gap-4 mt-6 print-options border-t dark:border-gray-700 pt-4">
-                        <button onClick={onClose} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-2.5 px-6 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">بستن</button>
-                        <button onClick={() => window.print()} className="bg-indigo-600 text-white py-2.5 px-6 rounded-lg hover:bg-indigo-700 shadow-md flex items-center gap-2 transition-colors">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                            چاپ سفارش
-                        </button>
-                    </div>
+                                <div className="mt-12 flex justify-between px-8 text-sm text-gray-500">
+                                    <div>مهر و امضای فروشنده</div>
+                                    <div>مهر و امضای خریدار</div>
+                                </div>
+                            </footer>
+                        </div>
+                        <div className="flex justify-end gap-4 mt-6 print-options border-t dark:border-gray-700 pt-4">
+                            <button onClick={onClose} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-2.5 px-6 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">بستن</button>
+                            <button onClick={() => window.print()} className="bg-indigo-600 text-white py-2.5 px-6 rounded-lg hover:bg-indigo-700 shadow-md flex items-center gap-2 transition-colors">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                چاپ سفارش
+                            </button>
+                        </div>
+                    </>
                 </Modal>
             );
         };
@@ -808,13 +810,17 @@
                          // 3. Fetch Invoices manually using demand_id (Fix for missing FKs)
                          const { data: invoices, error: invoiceError } = await supabaseClient
                             .from('demandinvoice')
-                            .select('demandid, totalshippingprice')
+                            .select('id, demandid, totalshippingprice') // Added 'id' here
                             .in('demandid', demandIds)
                             .eq('isdeleted', false); // Best practice to exclude deleted invoices
 
                          if (!invoiceError && invoices) {
                              invoices.forEach(inv => {
-                                 invoicesMap.set(inv.demandid, inv.totalshippingprice);
+                                 // Store object containing both price and id
+                                 invoicesMap.set(inv.demandid, { 
+                                     price: inv.totalshippingprice, 
+                                     id: inv.id 
+                                 });
                              });
                          }
                     }
@@ -834,7 +840,11 @@
                         
                         // Get base customer info from the map
                         const demandInfo = customersMap.get(po.demandid);
-                        const customerShippingCost = invoicesMap.get(po.demandid) || 0; // Get from map
+                        
+                        // Get Invoice Data from map
+                        const invoiceData = invoicesMap.get(po.demandid) || {};
+                        const customerShippingCost = invoiceData.price || 0; 
+                        const realInvoiceId = invoiceData.id || null;
                         
                         // --- Status Logic ---
                         // Find the status from the first demand item in this PO
@@ -850,7 +860,8 @@
                                 ...demandInfo, 
                                 status: statusString 
                             },
-                            customerShippingCost: customerShippingCost, // Store for UI
+                            customerShippingCost: customerShippingCost,
+                            realInvoiceId: realInvoiceId, // Store real Invoice ID for UI
                             subtotal,
                             totalAmount: subtotal + (po.actual_shipping_cost || 0)
                         };
@@ -1282,6 +1293,7 @@
                                              <th className="p-4 font-semibold cursor-pointer hover:text-indigo-500 transition-colors" onClick={() => requestSort('demandid')}>
                                                  <div className="flex items-center gap-1">تقاضا # <span className="text-xs">{getSortIcon('demandid')}</span></div>
                                              </th>
+                                             <th className="p-4 font-semibold text-center">فاکتور #</th>
                                              <th className="p-4 font-semibold">وضعیت تقاضا</th>
                                              <th className="p-4 font-semibold">تامین کننده</th>
                                              <th className="p-4 font-semibold">مشتری</th>
@@ -1312,6 +1324,7 @@
                                                  </td>
                                                  <td className="p-4 font-mono font-medium text-indigo-600 dark:text-indigo-400">{po.id}</td>
                                                  <td className="p-4 font-mono text-gray-500">{po.demandid}</td>
+                                                 <td className="p-4 font-mono text-center text-gray-500">{po.realInvoiceId || '-'}</td>
                                                  <td className="p-4">
                                                     <span className={`px-2.5 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDemandStatusStyles(po.demand?.status)}`}>
                                                         {po.demand?.status || '---'}
@@ -1370,7 +1383,7 @@
                                                   )}
                                                   <div>
                                                       <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-bold bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300">#{po.id}</span>
+                                                        <span className="text-xs font-bold bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300">PO #{po.id}</span>
                                                         <span className="text-xs text-gray-400">{new Date(po.created_at).toLocaleDateString('fa-IR')}</span>
                                                       </div>
                                                       <p className="font-bold text-gray-900 dark:text-white mt-1">{po.supplier?.fullname || 'نامشخص'}</p>
@@ -1378,6 +1391,7 @@
                                                       
                                                       <div className="flex flex-wrap items-center gap-2 mt-2">
                                                         <span className="text-xs text-gray-500">تقاضا: {po.demandid}</span>
+                                                        {po.realInvoiceId && <span className="text-xs text-gray-500">فاکتور: {po.realInvoiceId}</span>}
                                                         <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full whitespace-nowrap ${getDemandStatusStyles(po.demand?.status)}`}>
                                                             {po.demand?.status || '---'}
                                                         </span>
