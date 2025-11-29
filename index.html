@@ -343,6 +343,7 @@
                                             <th className="p-3 font-semibold">محصول</th>
                                             <th className="p-3 font-semibold text-center text-gray-500">تعداد درخواستی مشتری</th>
                                             <th className="p-3 font-semibold text-center">تعداد خرید</th>
+                                            <th className="p-3 font-semibold text-center text-gray-500">شناسه جزئیات فاکتور</th>
                                             <th className="p-3 font-semibold">قیمت خرید</th>
                                             <th className="p-3 font-semibold">جمع کل</th>
                                         </tr>
@@ -357,6 +358,10 @@
                                                         {detail.demand_item?.quantity || '-'}
                                                     </td>
                                                     <td className="p-3 text-center font-medium">{detail.quantity}</td>
+                                                    <td className="p-3 text-center font-mono text-xs text-gray-500">
+                                                        {detail.invDetailId ? `#${detail.invDetailId}` : '-'}
+                                                        {detail.invDetailShipping > 0 && <span className="block text-[10px] text-green-600">هزینه حمل: {formatCurrency(detail.invDetailShipping)}</span>}
+                                                    </td>
                                                     <td className="p-3 text-gray-600 dark:text-gray-300">{formatCurrency(detail.purchase_price)}</td>
                                                     <td className="p-3 font-medium">{formatCurrency(lineTotal)}</td>
                                                 </tr>
@@ -373,7 +378,7 @@
                                 <span>{formatCurrency(po.subtotal)} تومان</span>
                             </div>
                             <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                                <span>هزینه حمل مشتری (فاکتور):</span>
+                                <span>هزینه حمل مشتری (مجموع اقلام):</span>
                                 <span>{formatCurrency(po.customerShippingCost)} تومان</span>
                             </div>
                             <div className="flex justify-between text-sm font-medium text-gray-800 dark:text-gray-200">
@@ -613,7 +618,7 @@
                         <div className="flex justify-end gap-4 mt-6 print-options border-t dark:border-gray-700 pt-4">
                             <button onClick={onClose} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-2.5 px-6 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">بستن</button>
                             <button onClick={() => window.print()} className="bg-indigo-600 text-white py-2.5 px-6 rounded-lg hover:bg-indigo-700 shadow-md flex items-center gap-2 transition-colors">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                 چاپ سفارش
                             </button>
                         </div>
@@ -751,14 +756,15 @@
                     let poQuery = supabaseClient
                         .from('purchase_orders')
                         .select(`
-                            id, created_at, status, demandinvoice_id, demandid, actual_shipping_cost, supplier_id,
+                            id, created_at, status, demandid, actual_shipping_cost, supplier_id,
                             supplier:supplier_id(fullname, mobile, location:locationid(postalcode, address, plaque)),
                             purchase_order_details(
                                 id, quantity, purchase_price, demand_item_id,
                                 demand_item:demand_item_id(
                                     product:productid(title),
                                     demandstatusid,
-                                    quantity
+                                    quantity,
+                                    demandinvoicedetail:demandinvoicedetail(id, demandinvoiceid, shippingprice)
                                 )
                             )
                         `);
@@ -777,7 +783,6 @@
 
                     // Fetch customer info even if no demand items (edge case)
                     let customersMap = new Map();
-                    let invoicesMap = new Map(); // New Map for Invoices
 
                     if (demandIds.length > 0) {
                          // 1. Fetch Demands
@@ -806,23 +811,6 @@
                                 });
                             });
                          }
-
-                         // 3. Fetch Invoices manually using demand_id (Fix for missing FKs)
-                         const { data: invoices, error: invoiceError } = await supabaseClient
-                            .from('demandinvoice')
-                            .select('id, demandid, totalshippingprice') // Added 'id' here
-                            .in('demandid', demandIds)
-                            .eq('isdeleted', false); // Best practice to exclude deleted invoices
-
-                         if (!invoiceError && invoices) {
-                             invoices.forEach(inv => {
-                                 // Store object containing both price and id
-                                 invoicesMap.set(inv.demandid, { 
-                                     price: inv.totalshippingprice, 
-                                     id: inv.id 
-                                 });
-                             });
-                         }
                     }
 
                     // 1. Fetch all possible demand status types
@@ -836,32 +824,54 @@
                     const statusTypeMap = new Map(statusTypes.map(st => [st.id, st.main_status]));
 
                     const processedData = pos.map(po => {
-                        const subtotal = po.purchase_order_details.reduce((sum, detail) => sum + (detail.quantity * detail.purchase_price), 0);
+                        let subtotal = 0;
+                        let totalCustomerShipping = 0;
+                        let invoiceIds = new Set();
+
+                        // Process details to sum up shipping cost from demandinvoicedetail table
+                        const enrichedDetails = po.purchase_order_details.map(detail => {
+                            const lineTotal = detail.quantity * detail.purchase_price;
+                            subtotal += lineTotal;
+
+                            // Handle relationship to demandinvoicedetail (could be array or object depending on Supabase response)
+                            const invDetailData = detail.demand_item?.demandinvoicedetail;
+                            const invDetail = Array.isArray(invDetailData) ? invDetailData[0] : invDetailData;
+
+                            const shippingPrice = invDetail?.shippingprice || 0;
+                            const invId = invDetail?.demandinvoiceid;
+                            const invDetailId = invDetail?.id;
+
+                            if (invId) invoiceIds.add(invId);
+                            totalCustomerShipping += shippingPrice;
+
+                            return {
+                                ...detail,
+                                invDetailId, // Store specific detail ID
+                                invDetailShipping: shippingPrice,
+                                invId
+                            };
+                        });
                         
                         // Get base customer info from the map
                         const demandInfo = customersMap.get(po.demandid);
-                        
-                        // Get Invoice Data from map
-                        const invoiceData = invoicesMap.get(po.demandid) || {};
-                        const customerShippingCost = invoiceData.price || 0; 
-                        const realInvoiceId = invoiceData.id || null;
+                        const realInvoiceId = invoiceIds.size > 0 ? Array.from(invoiceIds).join(', ') : null;
                         
                         // --- Status Logic ---
-                        // Find the status from the first demand item in this PO
                         const firstDetail = po.purchase_order_details?.[0];
                         const statusId = firstDetail?.demand_item?.demandstatusid;
                         const statusString = statusTypeMap.get(statusId) || '---';
 
                         return {
                             ...po,
+                            purchase_order_details: enrichedDetails, // Use the enriched details
                             // FIX: Trim whitespace and default to 'باید بخرم' if null/empty to ensure counters work
                             status: po.status ? po.status.trim() : 'باید بخرم', 
                             demand: { 
                                 ...demandInfo, 
                                 status: statusString 
                             },
-                            customerShippingCost: customerShippingCost,
-                            realInvoiceId: realInvoiceId, // Store real Invoice ID for UI
+                            customerShippingCost: totalCustomerShipping, // Sum from demandinvoicedetail
+                            realInvoiceId: realInvoiceId, // Invoices found in details
                             subtotal,
                             totalAmount: subtotal + (po.actual_shipping_cost || 0)
                         };
