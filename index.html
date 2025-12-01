@@ -126,9 +126,6 @@
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHlqYXRvdGJ6eGFyZ254YXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MTIwMjEsImV4cCI6MjA2NzQ4ODAyMX0.2R448DuEBlTrNvaYXiYZ8D5M7MJNv7n1qmIDHQBNFiY';
         
         const supabaseClient = createClient(supabaseUrl, supabaseKey, { 
-            auth: {
-                persistSession: false
-            },
             global: { 
                 fetch: window.fetch.bind(window) 
             } 
@@ -154,6 +151,36 @@
             if (typeof value !== 'string' && typeof value !== 'number') return 0;
             if(typeof value === 'number') return value;
             return Number(String(value).replace(/,/g, '')) || 0;
+        };
+
+        // Reuse fetchUserBalance logic from Invoice Management
+        const fetchUserBalance = async (userId) => {
+            if (!userId) return 0;
+            try {
+                // 1. Get Total Payments (Credits)
+                const { data: transactions, error: txError } = await supabaseClient
+                    .from('usertransaction')
+                    .select('amount')
+                    .eq('userid', userId);
+                
+                if (txError) throw txError;
+                const totalPaid = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+
+                // 2. Get Total Invoiced Amount (Debits)
+                const { data: invoices, error: invError } = await supabaseClient
+                    .from('demandinvoice')
+                    .select('totalamount')
+                    .eq('customeruserid', userId);
+
+                if (invError) throw invError;
+                const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.totalamount || 0), 0);
+                
+                // 3. Calculate Balance: (Money In) - (Money Owed)
+                return totalPaid - totalInvoiced;
+            } catch (err) {
+                console.error('Exception fetching balance:', err);
+                return 0;
+            }
         };
         
         const PO_STATUSES = ['باید بخرم', 'خریداری شد', 'تحویل بازوی ارسال شد', 'تحویل مشتری شد', 'محاسبه سود و زیان انجام شد', 'Cancelled', 'Merged'];
@@ -321,7 +348,7 @@
         };
 
 
-        const ViewPOModal = ({ po, onClose }) => {
+        const ViewPOModal = ({ po, onClose, customerBalance }) => {
             if (!po) return null;
             return (
                 <Modal isOpen={!!po} onClose={onClose} title={`جزئیات سفارش خرید #${po.id}`}>
@@ -331,7 +358,15 @@
                             <div><span className="text-gray-500 dark:text-gray-400">تاریخ ایجاد:</span> <span className="font-semibold block text-base">{new Date(po.created_at).toLocaleDateString('fa-IR')}</span></div>
                             <div><span className="text-gray-500 dark:text-gray-400">فاکتور مشتری:</span> <span className="font-mono block">#{po.realInvoiceId || '---'}</span></div>
                             <div><span className="text-gray-500 dark:text-gray-400">شماره درخواست:</span> <span className="font-mono block">#{po.demandid || '---'}</span></div>
-                            <div className="sm:col-span-2"><span className="text-gray-500 dark:text-gray-400">مشتری:</span> <span className="font-semibold block text-base">{po.demand?.customer?.fullname || 'نامشخص'}</span></div>
+                            <div className="sm:col-span-2">
+                                <span className="text-gray-500 dark:text-gray-400">مشتری:</span> 
+                                <span className="font-semibold block text-base">{po.demand?.customer?.fullname || 'نامشخص'}</span>
+                                {typeof customerBalance === 'number' && (
+                                    <span className={`block mt-1 text-xs ${customerBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                        مانده حساب: {formatCurrency(customerBalance)} تومان
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         
                         <div>
@@ -395,7 +430,7 @@
             );
         };
 
-        const EditPOModal = ({ po, onClose, onSave }) => {
+        const EditPOModal = ({ po, onClose, onSave, customerBalance }) => {
             const [details, setDetails] = React.useState(JSON.parse(JSON.stringify(po.purchase_order_details)));
             const [actualShippingCost, setActualShippingCost] = React.useState(po.actual_shipping_cost || 0);
             const [isSaving, setIsSaving] = React.useState(false);
@@ -443,14 +478,25 @@
             return (
                 <Modal isOpen={!!po} onClose={onClose} title={`ویرایش سفارش خرید #${po.id}`}>
                     <div className="space-y-6">
-                         <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                             <label className="font-semibold text-sm mb-2 block">تامین کننده:</label>
-                             <SearchableDropdown
-                                 options={suppliersList}
-                                 value={selectedSupplierId}
-                                 onChange={setSelectedSupplierId}
-                                 placeholder="جستجو و انتخاب تامین کننده..."
-                             />
+                         <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg space-y-3">
+                             <div>
+                                 <label className="font-semibold text-sm mb-2 block">تامین کننده:</label>
+                                 <SearchableDropdown
+                                     options={suppliersList}
+                                     value={selectedSupplierId}
+                                     onChange={setSelectedSupplierId}
+                                     placeholder="جستجو و انتخاب تامین کننده..."
+                                 />
+                             </div>
+                             {typeof customerBalance === 'number' && (
+                                <div className="text-sm border-t border-gray-200 dark:border-gray-600 pt-2">
+                                    <span className="text-gray-500 dark:text-gray-400">مشتری: </span>
+                                    <span className="font-medium">{po.demand?.customer?.fullname}</span>
+                                    <span className="mx-2">|</span>
+                                    <span className="text-gray-500 dark:text-gray-400">مانده حساب: </span>
+                                    <span className={`font-bold ${customerBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>{formatCurrency(customerBalance)} تومان</span>
+                                </div>
+                             )}
                          </div>
                         <div className="overflow-x-auto rounded-lg border dark:border-gray-700">
                             <table className="w-full text-right text-sm">
@@ -485,7 +531,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
+                        <div className="flex items-center gap-4 bg-gray-5 dark:bg-gray-700/30 p-4 rounded-lg">
                             <label htmlFor="shipping-cost" className="font-semibold text-sm whitespace-nowrap">هزینه حمل واقعی:</label>
                             <input 
                                 id="shipping-cost"
@@ -675,7 +721,7 @@
                             <span className="font-bold mx-1 font-mono text-indigo-600 dark:text-indigo-400">#{updateInfo.poId}</span>
                             اطمینان دارید؟
                         </p>
-                        <div className="flex items-center justify-center gap-4 text-center p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                        <div className="flex items-center justify-center gap-4 text-center p-4 bg-gray-5 dark:bg-gray-700/30 rounded-lg">
                             <span className={`px-4 py-2 text-sm font-semibold rounded-lg border ${getStatusStyles(oldStatus)}`}>
                                 {oldStatus}
                             </span>
@@ -725,6 +771,7 @@
             const [startDate, setStartDate] = React.useState('');
             const [endDate, setEndDate] = React.useState('');
             const [hideCancelled, setHideCancelled] = React.useState(true); // Default to true
+            const [customerBalances, setCustomerBalances] = React.useState({}); // New State for Balances
 
             const [selectedPOs, setSelectedPOs] = React.useState(new Set());
             const [showMergeConfirm, setShowMergeConfirm] = React.useState(false);
@@ -749,139 +796,179 @@
                 return sortConfig.direction === 'ascending' ? '▲' : '▼';
             };
 
+            // Fetch balances for specific users
+            const fetchBalancesForUsers = async (userIds) => {
+                const uniqueIds = [...new Set(userIds)];
+                const missingIds = uniqueIds.filter(id => customerBalances[id] === undefined);
+                if (missingIds.length === 0) return;
+
+                const newBalances = {};
+                await Promise.all(missingIds.map(async (uid) => {
+                    const balance = await fetchUserBalance(uid);
+                    newBalances[uid] = balance;
+                }));
+                setCustomerBalances(prev => ({ ...prev, ...newBalances }));
+            };
+
             const fetchData = React.useCallback(async () => {
                 setIsLoading(true);
                 setError('');
+                
+                const fetchWithRetry = async (fn, retries = 3, delay = 1000) => {
+                    try {
+                        return await fn();
+                    } catch (err) {
+                        if (retries === 0) throw err;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return fetchWithRetry(fn, retries - 1, delay * 2);
+                    }
+                };
+
                 try {
-                    let poQuery = supabaseClient
-                        .from('purchase_orders')
-                        .select(`
-                            id, created_at, status, demandid, actual_shipping_cost, supplier_id,
-                            supplier:supplier_id(fullname, mobile, location:locationid(postalcode, address, plaque)),
-                            purchase_order_details(
-                                id, quantity, purchase_price, demand_item_id,
-                                demand_item:demand_item_id(
-                                    product:productid(title),
-                                    demandstatusid,
-                                    quantity,
-                                    demandinvoicedetail:demandinvoicedetail(id, demandinvoiceid, shippingprice)
+                    await fetchWithRetry(async () => {
+                        let poQuery = supabaseClient
+                            .from('purchase_orders')
+                            .select(`
+                                id, created_at, status, demandid, actual_shipping_cost, supplier_id,
+                                supplier:supplier_id(fullname, mobile, location:locationid(postalcode, address, plaque)),
+                                purchase_order_details(
+                                    id, quantity, purchase_price, demand_item_id,
+                                    demand_item:demand_item_id(
+                                        product:productid(title),
+                                        demandstatusid,
+                                        quantity,
+                                        demandinvoicedetail:demandinvoicedetail(id, demandinvoiceid, shippingprice)
+                                    )
                                 )
-                            )
-                        `);
+                            `);
 
-                    const { data: pos, error: poError } = await poQuery.order('created_at', { ascending: false });
+                        const { data: pos, error: poError } = await poQuery.order('created_at', { ascending: false });
 
-                    if (poError) throw poError;
-                    
-                    if (!pos || pos.length === 0) {
-                        setAllPurchaseOrders([]); 
-                        setIsLoading(false);
-                        return;
-                    }
-
-                    const demandIds = [...new Set(pos.map(po => po.demandid).filter(Boolean))];
-
-                    // Fetch customer info even if no demand items (edge case)
-                    let customersMap = new Map();
-
-                    if (demandIds.length > 0) {
-                         // 1. Fetch Demands
-                         const { data: demands, error: demandError } = await supabaseClient
-                            .from('demand')
-                            .select('id, customeruserid') 
-                            .in('id', demandIds);
+                        if (poError) throw poError;
                         
-                         if (demandError) throw demandError;
+                        if (!pos || pos.length === 0) {
+                            setAllPurchaseOrders([]); 
+                            // If we return here, we stop the loader in finally block
+                            return; 
+                        }
 
-                         // 2. Fetch Customers
-                         const customerIds = [...new Set(demands.map(d => d.customeruserid).filter(Boolean))];
-                         if(customerIds.length > 0) {
-                            const { data: customers, error: customerError } = await supabaseClient
-                                .from('profiles')
-                                .select('id, fullname')
-                                .in('id', customerIds);
+                        const demandIds = [...new Set(pos.map(po => po.demandid).filter(Boolean))];
+
+                        // Fetch customer info even if no demand items (edge case)
+                        let customersMap = new Map();
+
+                        if (demandIds.length > 0) {
+                             // 1. Fetch Demands
+                             const { data: demands, error: demandError } = await supabaseClient
+                                .from('demand')
+                                .select('id, customeruserid') 
+                                .in('id', demandIds);
                             
-                            if (customerError) throw customerError;
-                            const profileMap = new Map(customers.map(c => [c.id, c]));
-                            
-                            demands.forEach(d => {
-                                customersMap.set(d.id, { 
-                                    ...d, 
-                                    customer: profileMap.get(d.customeruserid) 
+                             if (demandError) throw demandError;
+
+                             // 2. Fetch Customers
+                             const customerIds = [...new Set(demands.map(d => d.customeruserid).filter(Boolean))];
+                             if(customerIds.length > 0) {
+                                const { data: customers, error: customerError } = await supabaseClient
+                                    .from('profiles')
+                                    .select('id, fullname')
+                                    .in('id', customerIds);
+                               
+                                if (customerError) throw customerError;
+                                const profileMap = new Map(customers.map(c => [c.id, c]));
+                                
+                                demands.forEach(d => {
+                                    customersMap.set(d.id, { 
+                                        ...d, 
+                                        customer: profileMap.get(d.customeruserid) 
+                                    });
                                 });
+                             }
+                        }
+
+                        // 1. Fetch all possible demand status types
+                        const { data: statusTypes, error: statusTypesError } = await supabaseClient
+                            .from('demandstatustype')
+                            .select('id, main_status');
+
+                        if (statusTypesError) throw statusTypesError;
+
+                        // 2. Create a lookup map for status types (id -> main_status string)
+                        const statusTypeMap = new Map(statusTypes.map(st => [st.id, st.main_status]));
+
+                        const processedData = pos.map(po => {
+                            let subtotal = 0;
+                            let totalCustomerShipping = 0;
+                            let invoiceIds = new Set();
+
+                            // Process details to sum up shipping cost from demandinvoicedetail table
+                            const enrichedDetails = po.purchase_order_details.map(detail => {
+                                const lineTotal = detail.quantity * detail.purchase_price;
+                                subtotal += lineTotal;
+
+                                // Handle relationship to demandinvoicedetail (could be array or object depending on Supabase response)
+                                const invDetailData = detail.demand_item?.demandinvoicedetail;
+                                const invDetail = Array.isArray(invDetailData) ? invDetailData[0] : invDetailData;
+
+                                const shippingPrice = invDetail?.shippingprice || 0;
+                                const invId = invDetail?.demandinvoiceid;
+                                const invDetailId = invDetail?.id;
+
+                                if (invId) invoiceIds.add(invId);
+                                totalCustomerShipping += shippingPrice;
+
+                                return {
+                                    ...detail,
+                                    invDetailId, // Store specific detail ID
+                                    invDetailShipping: shippingPrice,
+                                    invId
+                                };
                             });
-                         }
-                    }
-
-                    // 1. Fetch all possible demand status types
-                    const { data: statusTypes, error: statusTypesError } = await supabaseClient
-                        .from('demandstatustype')
-                        .select('id, main_status');
-
-                    if (statusTypesError) throw statusTypesError;
-
-                    // 2. Create a lookup map for status types (id -> main_status string)
-                    const statusTypeMap = new Map(statusTypes.map(st => [st.id, st.main_status]));
-
-                    const processedData = pos.map(po => {
-                        let subtotal = 0;
-                        let totalCustomerShipping = 0;
-                        let invoiceIds = new Set();
-
-                        // Process details to sum up shipping cost from demandinvoicedetail table
-                        const enrichedDetails = po.purchase_order_details.map(detail => {
-                            const lineTotal = detail.quantity * detail.purchase_price;
-                            subtotal += lineTotal;
-
-                            // Handle relationship to demandinvoicedetail (could be array or object depending on Supabase response)
-                            const invDetailData = detail.demand_item?.demandinvoicedetail;
-                            const invDetail = Array.isArray(invDetailData) ? invDetailData[0] : invDetailData;
-
-                            const shippingPrice = invDetail?.shippingprice || 0;
-                            const invId = invDetail?.demandinvoiceid;
-                            const invDetailId = invDetail?.id;
-
-                            if (invId) invoiceIds.add(invId);
-                            totalCustomerShipping += shippingPrice;
+                            
+                            // Get base customer info from the map
+                            const demandInfo = customersMap.get(po.demandid);
+                            const realInvoiceId = invoiceIds.size > 0 ? Array.from(invoiceIds).join(', ') : null;
+                            
+                            // --- Status Logic ---
+                            const firstDetail = po.purchase_order_details?.[0];
+                            const statusId = firstDetail?.demand_item?.demandstatusid;
+                            const statusString = statusTypeMap.get(statusId) || '---';
 
                             return {
-                                ...detail,
-                                invDetailId, // Store specific detail ID
-                                invDetailShipping: shippingPrice,
-                                invId
+                                ...po,
+                                purchase_order_details: enrichedDetails, // Use the enriched details
+                                // FIX: Trim whitespace and default to 'باید بخرم' if null/empty to ensure counters work
+                                status: po.status ? po.status.trim() : 'باید بخرم', 
+                                demand: { 
+                                    ...demandInfo, 
+                                    status: statusString 
+                                },
+                                customerShippingCost: totalCustomerShipping, // Sum from demandinvoicedetail
+                                realInvoiceId: realInvoiceId, // Invoices found in details
+                                subtotal,
+                                totalAmount: subtotal + (po.actual_shipping_cost || 0)
                             };
                         });
                         
-                        // Get base customer info from the map
-                        const demandInfo = customersMap.get(po.demandid);
-                        const realInvoiceId = invoiceIds.size > 0 ? Array.from(invoiceIds).join(', ') : null;
-                        
-                        // --- Status Logic ---
-                        const firstDetail = po.purchase_order_details?.[0];
-                        const statusId = firstDetail?.demand_item?.demandstatusid;
-                        const statusString = statusTypeMap.get(statusId) || '---';
+                        setAllPurchaseOrders(processedData); 
 
-                        return {
-                            ...po,
-                            purchase_order_details: enrichedDetails, // Use the enriched details
-                            // FIX: Trim whitespace and default to 'باید بخرم' if null/empty to ensure counters work
-                            status: po.status ? po.status.trim() : 'باید بخرم', 
-                            demand: { 
-                                ...demandInfo, 
-                                status: statusString 
-                            },
-                            customerShippingCost: totalCustomerShipping, // Sum from demandinvoicedetail
-                            realInvoiceId: realInvoiceId, // Invoices found in details
-                            subtotal,
-                            totalAmount: subtotal + (po.actual_shipping_cost || 0)
-                        };
+                        // Fetch Balances for all loaded POs
+                        const allCustomerIds = processedData
+                            .map(po => po.demand?.customeruserid)
+                            .filter(Boolean);
+                        
+                        if (allCustomerIds.length > 0) {
+                            fetchBalancesForUsers(allCustomerIds);
+                        }
                     });
-                    
-                    setAllPurchaseOrders(processedData); 
 
                 } catch (err) {
                     console.error("Error fetching purchase orders:", err);
-                    setError(`خطا در بارگذاری اطلاعات: ${err.message}`);
+                    let msg = err.message;
+                    if (msg === 'Failed to fetch') {
+                        msg = 'خطا در برقراری ارتباط با سرور. لطفا اتصال اینترنت خود را بررسی کنید یا دقایقی دیگر تلاش کنید.';
+                    }
+                    setError(`خطا در بارگذاری اطلاعات: ${msg}`);
                 } finally {
                     setIsLoading(false);
                 }
@@ -1292,7 +1379,7 @@
                              {/* Desktop Table */}
                              <div className="hidden md:block overflow-x-auto">
                                  <table className="w-full text-right">
-                                     <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm uppercase">
+                                     <thead className="bg-gray-5 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm uppercase">
                                          <tr className="border-b dark:border-gray-700">
                                              <th className="p-4 w-12 text-center">
                                                  <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
@@ -1307,6 +1394,7 @@
                                              <th className="p-4 font-semibold">وضعیت تقاضا</th>
                                              <th className="p-4 font-semibold">تامین کننده</th>
                                              <th className="p-4 font-semibold">مشتری</th>
+                                             <th className="p-4 font-semibold text-center">مانده حساب مشتری</th>
                                              <th className="p-4 font-semibold cursor-pointer hover:text-indigo-500 transition-colors" onClick={() => requestSort('created_at')}>
                                                  <div className="flex items-center gap-1">تاریخ <span className="text-xs">{getSortIcon('created_at')}</span></div>
                                              </th>
@@ -1321,7 +1409,7 @@
                                      </thead>
                                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
                                          {displayedPOs.map(po => (
-                                             <tr key={po.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
+                                             <tr key={po.id} className="hover:bg-gray-5 dark:hover:bg-gray-700/50 transition-colors duration-150">
                                                  <td className="p-4 text-center">
                                                      {po.status === 'باید بخرم' && (
                                                          <input 
@@ -1342,22 +1430,25 @@
                                                  </td>
                                                  <td className="p-4 font-medium">{po.supplier?.fullname || 'نامشخص'}</td>
                                                  <td className="p-4 text-gray-600 dark:text-gray-300">{po.demand?.customer?.fullname || 'نامشخص'}</td>
+                                                 <td className={`p-4 font-semibold text-center ${customerBalances[po.demand?.customeruserid] < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                     {customerBalances[po.demand?.customeruserid] !== undefined ? `${formatCurrency(customerBalances[po.demand?.customeruserid])} تومان` : '...'}
+                                                 </td>
                                                  <td className="p-4 text-gray-500">{new Date(po.created_at).toLocaleDateString('fa-IR')}</td>
                                                  <td className="p-4 font-mono text-center text-gray-600 dark:text-gray-400">{formatCurrency(po.customerShippingCost)}</td>
                                                  <td className="p-4 font-mono text-center text-gray-600 dark:text-gray-400">{formatCurrency(po.actual_shipping_cost || 0)}</td>
                                                  <td className="p-4 font-bold text-gray-800 dark:text-gray-200">{formatCurrency(po.totalAmount)}</td>
                                                  <td className="p-4">
                                                       <select
-                                                         value={po.status}
-                                                         onChange={(e) => {
-                                                             if (e.target.value !== po.status) {
-                                                                 setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
-                                                             }
-                                                         }}
-                                                         className={`rounded-lg p-1.5 text-xs font-semibold w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-gray-800 ${getStatusStyles(po.status)}`}
-                                                     >
-                                                         {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                                                     </select>
+                                                          value={po.status}
+                                                          onChange={(e) => {
+                                                              if (e.target.value !== po.status) {
+                                                                  setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
+                                                              }
+                                                          }}
+                                                          className={`rounded-lg p-1.5 text-xs font-semibold w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-gray-800 ${getStatusStyles(po.status)}`}
+                                                      >
+                                                          {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                                      </select>
                                                  </td>
                                                  <td className="p-4">
                                                      <div className="flex items-center justify-center gap-2">
@@ -1368,7 +1459,7 @@
                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                                                         </button>
                                                         <button onClick={() => setPrintingPO(po)} className="text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 p-1.5 rounded-lg transition-colors" title="چاپ">
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                                         </button>
                                                      </div>
                                                  </td>
@@ -1398,6 +1489,9 @@
                                                       </div>
                                                       <p className="font-bold text-gray-900 dark:text-white mt-1">{po.supplier?.fullname || 'نامشخص'}</p>
                                                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{po.demand?.customer?.fullname || 'مشتری نامشخص'}</p>
+                                                      <p className={`text-sm mt-1 font-semibold ${customerBalances[po.demand?.customeruserid] < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                          مانده حساب: {customerBalances[po.demand?.customeruserid] !== undefined ? `${formatCurrency(customerBalances[po.demand?.customeruserid])} تومان` : '...'}
+                                                      </p>
                                                       
                                                       <div className="flex flex-wrap items-center gap-2 mt-2">
                                                         <span className="text-xs text-gray-500">تقاضا: {po.demandid}</span>
@@ -1461,7 +1555,7 @@
                                  <div className="text-center py-16 px-4">
                                      <div className="bg-gray-100 dark:bg-gray-700 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
                                          <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                          </svg>
                                      </div>
                                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">هیچ سفارشی یافت نشد</h3>
@@ -1473,8 +1567,8 @@
                              )}
                          </div>
                      )}
-                       {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} />}
-                       {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} />}
+                       {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} customerBalance={customerBalances[viewingPO?.demand?.customeruserid]} />}
+                       {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} customerBalance={customerBalances[editingPO?.demand?.customeruserid]} />}
                        {printingPO && <PrintablePOModal po={printingPO} onClose={() => setPrintingPO(null)} />}
                        {showMergeConfirm && <MergeConfirmationModal mergeInfo={mergeInfo} onCancel={() => setShowMergeConfirm(false)} onConfirm={handleConfirmMerge} isMerging={isMerging} />}
                        <StatusConfirmationModal updateInfo={statusUpdateInfo} onCancel={() => setStatusUpdateInfo(null)} onConfirm={executeStatusUpdate} isUpdating={isUpdatingStatus} />
