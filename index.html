@@ -426,8 +426,8 @@
                                 <span>{formatCurrency(po.actual_shipping_cost || 0)} تومان</span>
                             </div>
                             <div className="flex justify-between font-bold text-lg text-indigo-700 dark:text-indigo-300 pt-2 border-t border-indigo-200 dark:border-indigo-800">
-                                <span>مبلغ کل نهایی (خرید + حمل کل):</span>
-                                <span>{formatCurrency(po.totalAmount)} تومان</span>
+                                <span>مبلغ فاکتور تامین کننده:</span>
+                                <span>{formatCurrency(po.subtotal)} تومان</span>
                             </div>
                         </div>
                     </div>
@@ -477,13 +477,13 @@
 
             const subtotal = details.reduce((sum, d) => sum + (parseFormattedNumber(d.quantity) * parseFormattedNumber(d.purchase_price)), 0);
             const totalRowShipping = details.reduce((sum, d) => sum + (parseFormattedNumber(d.quantity) * parseFormattedNumber(d.actual_shipping_price || 0)), 0);
-            // Total amount is now subtotal + totalRowShipping
-            const totalAmount = subtotal + totalRowShipping;
+            // Total amount is now JUST subtotal (Supplier PO price)
+            const totalAmount = subtotal;
 
             const handleSave = async () => {
                 setIsSaving(true);
                 try {
-                    // Automatically using totalRowShipping as the actual_shipping_cost for the PO
+                    // Automatically using totalRowShipping as the actual_shipping_cost for the PO, but it's not added to the displayed total amount anymore
                     await onSave(po.id, details, totalRowShipping, selectedSupplierId);
                 } catch (error) {
                     showToast(`خطا در ذخیره سازی: ${error.message}`, 'error');
@@ -574,7 +574,7 @@
                                 </div>
                                 <div className="h-px bg-indigo-200 dark:bg-indigo-700 my-2"></div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-indigo-800 dark:text-indigo-200 font-bold">مبلغ کل نهایی سفارش:</span>
+                                    <span className="text-indigo-800 dark:text-indigo-200 font-bold">مبلغ فاکتور تامین کننده:</span>
                                     <span className="text-xl font-bold text-indigo-700 dark:text-indigo-300">{formatCurrency(totalAmount)} تومان</span>
                                 </div>
                             </div>
@@ -684,8 +684,8 @@
                                             <span>{formatCurrency(po.actual_shipping_cost || 0)}</span>
                                         </div>
                                         <div className="flex justify-between gap-4 font-bold text-lg border-t border-gray-300 pt-3 mt-2">
-                                            <span>جمع کل سفارش:</span>
-                                            <span>{formatCurrency(po.totalAmount)} تومان</span>
+                                            <span>مبلغ فاکتور تامین کننده:</span>
+                                            <span>{formatCurrency(po.subtotal)} تومان</span>
                                         </div>
                                     </div>
                                 </div>
@@ -980,7 +980,7 @@
                                 customerShippingCost: totalCustomerShipping, // Sum from demandinvoicedetail
                                 realInvoiceId: realInvoiceId, // Invoices found in details
                                 subtotal,
-                                totalAmount: subtotal + (po.actual_shipping_cost || 0)
+                                totalAmount: subtotal // + (po.actual_shipping_cost || 0) - Removed per user request
                             };
                         });
                         
@@ -1438,7 +1438,7 @@
                                              <th className="p-4 font-semibold text-center">هزینه حمل مشتری</th>
                                              <th className="p-4 font-semibold text-center">هزینه حمل واقعی</th>
                                              <th className="p-4 font-semibold cursor-pointer hover:text-indigo-500 transition-colors" onClick={() => requestSort('totalAmount')}>
-                                                 <div className="flex items-center gap-1">مبلغ کل <span className="text-xs">{getSortIcon('totalAmount')}</span></div>
+                                                 <div className="flex items-center gap-1">مبلغ فاکتور تامین کننده <span className="text-xs">{getSortIcon('totalAmount')}</span></div>
                                              </th>
                                              <th className="p-4 font-semibold">وضعیت سفارش</th>
                                              <th className="p-4 font-semibold text-center">عملیات</th>
