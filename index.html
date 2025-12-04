@@ -392,7 +392,7 @@
                                                 <tr key={detail.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                     <td className="p-3">{detail.demand_item?.product?.title || 'محصول نامشخص'}</td>
                                                     <td className="p-3 text-center text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-gray-800/50">
-                                                        {detail.demand_item?.quantity || '-'}
+                                                        {detail.customerRequestedQty || '-'}
                                                     </td>
                                                     <td className="p-3 text-center font-medium">{detail.quantity}</td>
                                                     <td className="p-3 text-center font-mono text-xs text-gray-500">
@@ -447,14 +447,20 @@
                  const fetchSuppliers = async () => {
                      const { data, error } = await supabaseClient
                          .from('profiles')
-                         .select('id, fullname')
+                         // CHANGE: Added firstname to fetch
+                         .select('id, fullname, firstname') 
                          .eq('roleid', 3);
                          
                      if (error) {
                          console.error('Error fetching suppliers:', error);
                          showToast('خطا در دریافت لیست تامین کنندگان', 'error');
                      } else {
-                         setSuppliersList(data);
+                         // CHANGE: Map data to combine firstname and fullname
+                         const formattedSuppliers = data.map(s => ({
+                             id: s.id,
+                             fullname: s.firstname ? `${s.firstname} ${s.fullname}` : s.fullname
+                         }));
+                         setSuppliersList(formattedSuppliers);
                      }
                  };
                  fetchSuppliers();
@@ -871,7 +877,7 @@
                                         product:productid(title),
                                         demandstatusid,
                                         quantity,
-                                        demandinvoicedetail:demandinvoicedetail(id, demandinvoiceid, shippingprice)
+                                        demandinvoicedetail:demandinvoicedetail(id, demandinvoiceid, shippingprice, quantity)
                                     )
                                 )
                             `);
@@ -937,25 +943,37 @@
 
                             // Process details to sum up shipping cost from demandinvoicedetail table
                             const enrichedDetails = po.purchase_order_details.map(detail => {
-                                const lineTotal = detail.quantity * detail.purchase_price;
-                                subtotal += lineTotal;
-
-                                // Handle relationship to demandinvoicedetail (could be array or object depending on Supabase response)
+                                // Handle relationship to demandinvoicedetail
                                 const invDetailData = detail.demand_item?.demandinvoicedetail;
                                 const invDetail = Array.isArray(invDetailData) ? invDetailData[0] : invDetailData;
 
                                 const shippingPrice = invDetail?.shippingprice || 0;
                                 const invId = invDetail?.demandinvoiceid;
                                 const invDetailId = invDetail?.id;
+                                
+                                // === LOGIC UPDATE ===
+                                // 1. Customer Requested Qty: Strictly from Demand Item table
+                                const customerRequestedQty = detail.demand_item?.quantity || 0;
+
+                                // 2. Purchase Qty (The quantity used in PO): Prefer Demand Invoice Detail quantity if valid
+                                // If invDetail.quantity is null or undefined, fallback to the stored PO detail quantity
+                                const purchaseQty = (invDetail && typeof invDetail.quantity === 'number') 
+                                    ? invDetail.quantity 
+                                    : detail.quantity;
+
+                                const lineTotal = purchaseQty * detail.purchase_price;
+                                subtotal += lineTotal;
 
                                 if (invId) invoiceIds.add(invId);
                                 totalCustomerShipping += shippingPrice;
 
                                 return {
                                     ...detail,
-                                    invDetailId, // Store specific detail ID
+                                    quantity: purchaseQty, // Use the determined Purchase Quantity
+                                    invDetailId, 
                                     invDetailShipping: shippingPrice,
-                                    invId
+                                    invId,
+                                    customerRequestedQty 
                                 };
                             });
                             
@@ -971,16 +989,15 @@
                             return {
                                 ...po,
                                 purchase_order_details: enrichedDetails, // Use the enriched details
-                                // FIX: Trim whitespace and default to 'باید بخرم' if null/empty to ensure counters work
                                 status: po.status ? po.status.trim() : 'باید بخرم', 
                                 demand: { 
                                     ...demandInfo, 
                                     status: statusString 
                                 },
-                                customerShippingCost: totalCustomerShipping, // Sum from demandinvoicedetail
-                                realInvoiceId: realInvoiceId, // Invoices found in details
+                                customerShippingCost: totalCustomerShipping, 
+                                realInvoiceId: realInvoiceId, 
                                 subtotal,
-                                totalAmount: subtotal // + (po.actual_shipping_cost || 0) - Removed per user request
+                                totalAmount: subtotal 
                             };
                         });
                         
@@ -1136,6 +1153,19 @@
                             .eq('id', detail.id)
                     );
 
+                    // Sync changes back to Demand Invoice Detail table
+                    const invoiceDetailUpdatePromises = updatedDetails
+                        .filter(detail => detail.invDetailId) 
+                        .map(detail => 
+                            supabaseClient
+                                .from('demandinvoicedetail')
+                                .update({
+                                    shippingprice: parseFormattedNumber(detail.actual_shipping_price),
+                                    quantity: parseFormattedNumber(detail.quantity) // Sync Quantity as well
+                                })
+                                .eq('id', detail.invDetailId)
+                        );
+
                     const poUpdatePromise = supabaseClient
                         .from('purchase_orders')
                         .update({ 
@@ -1144,7 +1174,11 @@
                         })
                         .eq('id', poId);
 
-                    const results = await Promise.all([...detailUpdatePromises, poUpdatePromise]);
+                    const results = await Promise.all([
+                        ...detailUpdatePromises, 
+                        ...invoiceDetailUpdatePromises, // Include new promises
+                        poUpdatePromise
+                    ]);
                     
                     const firstError = results.find(res => res.error);
                     if (firstError) throw firstError.error;
