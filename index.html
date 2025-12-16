@@ -73,7 +73,7 @@
             padding: 1.5rem;
             border-radius: 0.75rem;
             width: 95%;
-            max-width: 950px; /* Increased width for new column */
+            max-width: 950px;
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -323,9 +323,9 @@
                         value={isOpen ? searchTerm : (selectedOption?.fullname || '')}
                         onChange={handleInputChange}
                         onFocus={handleInputFocus}
-                        onBlur={handleInputBlur}
+                        // onBlur={handleInputBlur} // Disabling blur logic to prevent conflicts with click event on dropdown options
                         placeholder={placeholder}
-                        className="w-full bg-gray-5 dark:bg-gray-700 p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                        className="w-full bg-gray-50 dark:bg-gray-700 p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                     />
                     {isOpen && (
                         <ul className="absolute z-20 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg mt-1 max-h-60 overflow-y-auto shadow-xl">
@@ -437,7 +437,6 @@
 
         const EditPOModal = ({ po, onClose, onSave, customerBalance }) => {
             const [details, setDetails] = React.useState(JSON.parse(JSON.stringify(po.purchase_order_details)));
-            // Removing manual actualShippingCost state as it's now derived
             const [isSaving, setIsSaving] = React.useState(false);
             const [suppliersList, setSuppliersList] = React.useState([]);
             const [selectedSupplierId, setSelectedSupplierId] = React.useState(po.supplier_id);
@@ -445,51 +444,60 @@
 
              React.useEffect(() => {
                  const fetchSuppliers = async () => {
-                     const { data, error } = await supabaseClient
-                         .from('profiles')
-                         // CHANGE: Added firstname to fetch
-                         .select('id, fullname, firstname') 
-                         .eq('roleid', 3);
-                         
-                     if (error) {
-                         console.error('Error fetching suppliers:', error);
-                         showToast('خطا در دریافت لیست تامین کنندگان', 'error');
-                     } else {
-                         // CHANGE: Map data to combine firstname and fullname
-                         const formattedSuppliers = data.map(s => ({
-                             id: s.id,
-                             fullname: s.firstname ? `${s.firstname} ${s.fullname}` : s.fullname
-                         }));
-                         setSuppliersList(formattedSuppliers);
-                     }
-                 };
-                 fetchSuppliers();
-             }, [showToast]);
+                    const { data, error } = await supabaseClient
+                        .from('profiles')
+                        .select('id, fullname, firstname') 
+                        .eq('roleid', 3);
+                        
+                    if (error) {
+                        console.error('Error fetching suppliers:', error);
+                        showToast('خطا در دریافت لیست تامین کنندگان', 'error');
+                    } else {
+                        // Map data to combine firstname and fullname
+                        const formattedSuppliers = data.map(s => ({
+                            id: s.id,
+                            fullname: s.firstname ? `${s.firstname} ${s.fullname}` : s.fullname
+                        }));
+                        setSuppliersList(formattedSuppliers);
+                    }
+                };
+                fetchSuppliers();
+            }, [showToast]);
 
             const handleDetailChange = (index, field, value) => {
                 const newDetails = [...details];
-                newDetails[index][field] = value;
+                
+                // Format input value for display, but store the parsed number
+                const parsedValue = parseFormattedNumber(value);
+                
+                newDetails[index][field] = parsedValue;
                 setDetails(newDetails);
             };
 
             const handleBatchShippingChange = (index, totalBatchValue) => {
                 const newDetails = [...details];
                 const qty = parseFormattedNumber(newDetails[index].quantity);
+                const parsedTotalBatchValue = parseFormattedNumber(totalBatchValue);
                 if (qty && qty > 0) {
-                    newDetails[index].actual_shipping_price = totalBatchValue / qty;
+                    // Calculate unit shipping cost from total batch value
+                    const unitShippingCost = parsedTotalBatchValue / qty;
+                    newDetails[index].actual_shipping_price = unitShippingCost;
                     setDetails(newDetails);
+                } else {
+                     newDetails[index].actual_shipping_price = 0;
+                     setDetails(newDetails);
                 }
             };
 
             const subtotal = details.reduce((sum, d) => sum + (parseFormattedNumber(d.quantity) * parseFormattedNumber(d.purchase_price)), 0);
             const totalRowShipping = details.reduce((sum, d) => sum + (parseFormattedNumber(d.quantity) * parseFormattedNumber(d.actual_shipping_price || 0)), 0);
-            // Total amount is now JUST subtotal (Supplier PO price)
+            // Total amount is JUST subtotal (Supplier PO price)
             const totalAmount = subtotal;
 
             const handleSave = async () => {
                 setIsSaving(true);
                 try {
-                    // Automatically using totalRowShipping as the actual_shipping_cost for the PO, but it's not added to the displayed total amount anymore
+                    // Automatically using totalRowShipping as the actual_shipping_cost for the PO
                     await onSave(po.id, details, totalRowShipping, selectedSupplierId);
                 } catch (error) {
                     showToast(`خطا در ذخیره سازی: ${error.message}`, 'error');
@@ -501,26 +509,26 @@
             return (
                 <Modal isOpen={!!po} onClose={onClose} title={`ویرایش سفارش خرید #${po.id}`}>
                     <div className="space-y-6">
-                          <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg space-y-3">
-                             <div>
-                                 <label className="font-semibold text-sm mb-2 block">تامین کننده:</label>
-                                 <SearchableDropdown
-                                     options={suppliersList}
-                                     value={selectedSupplierId}
-                                     onChange={setSelectedSupplierId}
-                                     placeholder="جستجو و انتخاب تامین کننده..."
-                                 />
-                             </div>
-                             {typeof customerBalance === 'number' && (
-                                <div className="text-sm border-t border-gray-200 dark:border-gray-600 pt-2">
-                                    <span className="text-gray-500 dark:text-gray-400">مشتری: </span>
-                                    <span className="font-medium">{po.demand?.customer?.fullname}</span>
-                                    <span className="mx-2">|</span>
-                                    <span className="text-gray-500 dark:text-gray-400">مانده حساب: </span>
-                                    <span className={`font-bold ${customerBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>{formatCurrency(customerBalance)} تومان</span>
+                             <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg space-y-3">
+                                <div>
+                                    <label className="font-semibold text-sm mb-2 block">تامین کننده:</label>
+                                    <SearchableDropdown
+                                        options={suppliersList}
+                                        value={selectedSupplierId}
+                                        onChange={setSelectedSupplierId}
+                                        placeholder="جستجو و انتخاب تامین کننده..."
+                                    />
                                 </div>
-                             )}
-                          </div>
+                                 {typeof customerBalance === 'number' && (
+                                     <div className="text-sm border-t border-gray-200 dark:border-gray-600 pt-2">
+                                         <span className="text-gray-500 dark:text-gray-400">مشتری: </span>
+                                         <span className="font-medium">{po.demand?.customer?.fullname}</span>
+                                         <span className="mx-2">|</span>
+                                         <span className="text-gray-500 dark:text-gray-400">مانده حساب: </span>
+                                         <span className={`font-bold ${customerBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>{formatCurrency(customerBalance)} تومان</span>
+                                     </div>
+                                 )}
+                             </div>
                         <div className="overflow-x-auto rounded-lg border dark:border-gray-700">
                             <table className="w-full text-right text-sm">
                                 <thead className="bg-gray-100 dark:bg-gray-700">
@@ -545,24 +553,37 @@
                                                 />
                                             </td>
                                             <td className="p-3">
-                                                <input type="text" value={formatNumberWithCommas(detail.purchase_price)} onChange={(e) => handleDetailChange(index, 'purchase_price', parseFormattedNumber(e.target.value))} className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 p-2 rounded-md text-center focus:ring-2 focus:ring-indigo-500 outline-none"/>
-                                            </td>
-                                            <td className="p-3">
                                                 <input 
                                                     type="text" 
-                                                    value={formatNumberWithCommas((detail.actual_shipping_price || 0) * (detail.quantity || 0))} 
-                                                    onChange={(e) => handleBatchShippingChange(index, parseFormattedNumber(e.target.value))} 
-                                                    className="w-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-2 rounded-md text-center focus:ring-2 focus:ring-blue-500 outline-none font-medium"
-                                                    placeholder="0"
+                                                    value={formatNumberWithCommas(detail.purchase_price)} 
+                                                    onChange={(e) => handleDetailChange(index, 'purchase_price', e.target.value)} 
+                                                    className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 p-2 rounded-md text-center focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    dir="ltr"
                                                 />
                                             </td>
                                             <td className="p-3">
+                                                {/* This input represents the total batch shipping cost (calculated from actual_shipping_price * quantity)
+                                                    and is used to set the unit actual_shipping_price. */}
+                                                <input 
+                                                    type="text" 
+                                                    value={formatNumberWithCommas((detail.actual_shipping_price || 0) * (detail.quantity || 0))} 
+                                                    onChange={(e) => handleBatchShippingChange(index, e.target.value)} 
+                                                    className="w-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-2 rounded-md text-center focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                                                    placeholder="0"
+                                                    dir="ltr"
+                                                />
+                                            </td>
+                                            <td className="p-3">
+                                                {/* This input represents the unit actual shipping cost paid by US (actual_shipping_price)
+                                                    This value is ONLY saved to purchase_order_details.actual_shipping_price.
+                                                    It is NOT synchronized to demandinvoicedetail.shippingprice anymore. */}
                                                 <input 
                                                     type="text" 
                                                     value={formatNumberWithCommas(Math.round(detail.actual_shipping_price || 0))} 
-                                                    onChange={(e) => handleDetailChange(index, 'actual_shipping_price', parseFormattedNumber(e.target.value))} 
+                                                    onChange={(e) => handleDetailChange(index, 'actual_shipping_price', e.target.value)} 
                                                     className="w-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 p-2 rounded-md text-center focus:ring-2 focus:ring-indigo-500 outline-none"
                                                     placeholder="0"
+                                                    dir="ltr"
                                                 />
                                             </td>
                                         </tr>
@@ -715,7 +736,7 @@
         
         const MergeConfirmationModal = ({ mergeInfo, onConfirm, onCancel, isMerging }) => {
             if (!mergeInfo.possible) return null;
-        
+            
             return (
                 <Modal isOpen={true} onClose={onCancel} title="تایید ادغام سفارشات">
                     <div className="space-y-4">
@@ -761,7 +782,7 @@
                             <span className="font-bold mx-1 font-mono text-indigo-600 dark:text-indigo-400">#{updateInfo.poId}</span>
                             اطمینان دارید؟
                         </p>
-                        <div className="flex items-center justify-center gap-4 text-center p-4 bg-gray-5 dark:bg-gray-700/30 rounded-lg">
+                        <div className="flex items-center justify-center gap-4 text-center p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                             <span className={`px-4 py-2 text-sm font-semibold rounded-lg border ${getStatusStyles(oldStatus)}`}>
                                 {oldStatus}
                             </span>
@@ -900,29 +921,29 @@
                         if (demandIds.length > 0) {
                              // 1. Fetch Demands
                              const { data: demands, error: demandError } = await supabaseClient
-                                .from('demand')
-                                .select('id, customeruserid') 
-                                .in('id', demandIds);
+                                 .from('demand')
+                                 .select('id, customeruserid') 
+                                 .in('id', demandIds);
                             
                              if (demandError) throw demandError;
 
                              // 2. Fetch Customers
                              const customerIds = [...new Set(demands.map(d => d.customeruserid).filter(Boolean))];
                              if(customerIds.length > 0) {
-                                const { data: customers, error: customerError } = await supabaseClient
-                                    .from('profiles')
-                                    .select('id, fullname')
-                                    .in('id', customerIds);
-                               
-                                if (customerError) throw customerError;
-                                const profileMap = new Map(customers.map(c => [c.id, c]));
+                                 const { data: customers, error: customerError } = await supabaseClient
+                                     .from('profiles')
+                                     .select('id, fullname')
+                                     .in('id', customerIds);
                                 
-                                demands.forEach(d => {
-                                    customersMap.set(d.id, { 
-                                        ...d, 
-                                        customer: profileMap.get(d.customeruserid) 
-                                    });
-                                });
+                                 if (customerError) throw customerError;
+                                 const profileMap = new Map(customers.map(c => [c.id, c]));
+                                
+                                 demands.forEach(d => {
+                                     customersMap.set(d.id, { 
+                                         ...d, 
+                                         customer: profileMap.get(d.customeruserid) 
+                                     });
+                                 });
                              }
                         }
 
@@ -992,6 +1013,8 @@
                                 status: po.status ? po.status.trim() : 'باید بخرم', 
                                 demand: { 
                                     ...demandInfo, 
+                                    customeruserid: demandInfo?.customeruserid, // Explicitly keep this for balance lookup
+                                    customer: demandInfo?.customer,
                                     status: statusString 
                                 },
                                 customerShippingCost: totalCustomerShipping, 
@@ -1116,6 +1139,7 @@
                 const { poId, newStatus, oldStatus } = statusUpdateInfo;
             
                 setIsUpdatingStatus(true);
+                // Optimistic update
                 setAllPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: newStatus } : po));
                 setStatusUpdateInfo(null); 
             
@@ -1126,6 +1150,7 @@
             
                 if (updateError) {
                     console.error("Error updating status:", updateError);
+                    // Rollback optimistic update
                     setAllPurchaseOrders(prevPOs => prevPOs.map(po => po.id === poId ? { ...po, status: oldStatus } : po));
                     showToast(`خطا در بروزرسانی وضعیت: ${updateError.message}`, 'error');
                 } else {
@@ -1142,6 +1167,7 @@
 
             const handleSavePO = async (poId, updatedDetails, actualShippingCost, supplierId) => {
                 try {
+                    // 1. Update Purchase Order Details (PO price and actual shipping cost to us)
                     const detailUpdatePromises = updatedDetails.map(detail =>
                         supabaseClient
                             .from('purchase_order_details')
@@ -1153,19 +1179,21 @@
                             .eq('id', detail.id)
                     );
 
-                    // Sync changes back to Demand Invoice Detail table
+                    // 2. Sync ONLY Quantity back to Demand Invoice Detail table (as requested by user)
+                    // We explicitly *DO NOT* update 'shippingprice' in demandinvoicedetail.
                     const invoiceDetailUpdatePromises = updatedDetails
                         .filter(detail => detail.invDetailId) 
                         .map(detail => 
                             supabaseClient
                                 .from('demandinvoicedetail')
                                 .update({
-                                    shippingprice: parseFormattedNumber(detail.actual_shipping_price),
-                                    quantity: parseFormattedNumber(detail.quantity) // Sync Quantity as well
+                                    // shippingprice: parseFormattedNumber(detail.actual_shipping_price), <-- REMOVED AS REQUESTED
+                                    quantity: parseFormattedNumber(detail.quantity) // Keep syncing Quantity
                                 })
                                 .eq('id', detail.invDetailId)
                         );
 
+                    // 3. Update the main Purchase Order record (total actual shipping cost and supplier)
                     const poUpdatePromise = supabaseClient
                         .from('purchase_orders')
                         .update({ 
@@ -1174,14 +1202,17 @@
                         })
                         .eq('id', poId);
 
-                    const results = await Promise.all([
+                    const results = await Promise.allSettled([
                         ...detailUpdatePromises, 
-                        ...invoiceDetailUpdatePromises, // Include new promises
+                        ...invoiceDetailUpdatePromises,
                         poUpdatePromise
                     ]);
                     
-                    const firstError = results.find(res => res.error);
-                    if (firstError) throw firstError.error;
+                    const errors = results.filter(res => res.status === 'rejected' || (res.value && res.value.error));
+                    if (errors.length > 0) {
+                        const firstError = errors.length > 0 ? (errors[0].reason?.message || errors[0].value?.error?.message || 'خطای نامشخص') : '';
+                        throw new Error(firstError);
+                    }
                     
                     showToast('سفارش خرید با موفقیت بروزرسانی شد.');
                     setEditingPO(null);
@@ -1203,22 +1234,36 @@
                     mergeInfo.poObjects.forEach(po => {
                         po.purchase_order_details.forEach(detail => {
                             const key = detail.demand_item_id;
+                            const currentQty = parseFormattedNumber(detail.quantity);
+                            const currentPrice = parseFormattedNumber(detail.purchase_price);
+                            const currentShipping = parseFormattedNumber(detail.actual_shipping_price || 0);
+
                             if (mergedItems.has(key)) {
                                 const existing = mergedItems.get(key);
-                                existing.quantity = Number(existing.quantity) + Number(detail.quantity);
+                                // Simple aggregation (assuming price/shipping must be uniform for mergeable items, or we take the latest/highest)
+                                existing.quantity = Number(existing.quantity) + currentQty;
+                                // For simplicity and consistency, keep the existing unit price/shipping price.
+                                // NOTE: In a real system, average price calculation would be safer if prices differ.
+                                // For now, we assume the price/shipping are consistent or we take the latest.
+                                mergedItems.set(key, existing);
                             } else {
-                                mergedItems.set(key, { ...detail });
+                                mergedItems.set(key, { 
+                                    ...detail, 
+                                    quantity: currentQty,
+                                    purchase_price: currentPrice,
+                                    actual_shipping_price: currentShipping
+                                });
                             }
                         });
                     });
                     
-                    // Note: 'demandinvoice_id' must be in the initial Select query for this to work
+                    // 1. Create the new Purchase Order
                     const { data: newPO, error: newPOError } = await supabaseClient
                         .from('purchase_orders')
                         .insert({
                             supplier_id: mergeInfo.supplierId,
                             status: 'باید بخرم',
-                            demandid: mergeInfo.poObjects[0].demandid,
+                            demandid: mergeInfo.poObjects[0].demandid, // Assuming single demand for merged group, using the first one
                             demandinvoice_id: mergeInfo.poObjects[0].demandinvoice_id,
                         })
                         .select()
@@ -1226,12 +1271,13 @@
 
                     if (newPOError) throw newPOError;
 
+                    // 2. Insert merged details
                     const newDetails = Array.from(mergedItems.values()).map(item => ({
                         purchase_order_id: newPO.id,
                         demand_item_id: item.demand_item_id,
                         quantity: item.quantity,
                         purchase_price: item.purchase_price,
-                        actual_shipping_price: item.actual_shipping_price // Ensure merged items carry over shipping price if set
+                        actual_shipping_price: item.actual_shipping_price
                     }));
 
                     const { error: newDetailsError } = await supabaseClient
@@ -1239,10 +1285,12 @@
                         .insert(newDetails);
                     
                     if (newDetailsError) {
+                        // Attempt to rollback PO creation if detail insertion fails
                         await supabaseClient.from('purchase_orders').delete().eq('id', newPO.id);
                         throw newDetailsError;
                     }
 
+                    // 3. Mark old POs as Merged
                     const oldPoIds = mergeInfo.poObjects.map(po => po.id);
                     const { error: updateOldError } = await supabaseClient
                         .from('purchase_orders')
@@ -1251,10 +1299,10 @@
                     
                     if (updateOldError) throw updateOldError;
 
-                    // Log changes for all merged POs
+                    // 4. Log changes for all merged POs
                     const logEntries = oldPoIds.map(id => ({
                         purchase_order_id: id,
-                        previous_status: 'باید بخرم', // We know they were 'باید بخرم' based on merge logic
+                        previous_status: 'باید بخرم', // We know they were 'باید بخرم'
                         new_status: 'Merged'
                     }));
                     await supabaseClient.from('purchase_order_logs').insert(logEntries);
@@ -1276,8 +1324,13 @@
         
                 if (sortConfig.key) {
                     sortableItems.sort((a, b) => {
-                        const aValue = a[sortConfig.key];
-                        const bValue = b[sortConfig.key];
+                        let aValue = a[sortConfig.key];
+                        let bValue = b[sortConfig.key];
+
+                        if (sortConfig.key === 'totalAmount') {
+                            aValue = a.totalAmount;
+                            bValue = b.totalAmount;
+                        }
 
                         if (aValue === null || aValue === undefined) return 1;
                         if (bValue === null || bValue === undefined) return -1;
@@ -1322,125 +1375,125 @@
                              <p className="text-gray-500 dark:text-gray-400 mt-1">سفارشات ارسال شده به تامین کنندگان را پیگیری کنید.</p>
                          </div>
                          <div className="flex gap-2">
-                            <button onClick={fetchData} className="p-2 bg-gray-200 dark:bg-gray-700 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors" title="بروزرسانی">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                            </button>
+                             <button onClick={fetchData} className="p-2 bg-gray-200 dark:bg-gray-700 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors" title="بروزرسانی">
+                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                 </svg>
+                             </button>
                          </div>
                      </header>
 
                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-                        <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-yellow-500 dark:border-yellow-400">
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">باید بخرم</div>
-                            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['باید بخرم'] || 0}</div>
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-blue-500 dark:border-blue-400">
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">خریداری شد</div>
-                            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['خریداری شد'] || 0}</div>
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-purple-500 dark:border-purple-400">
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">تحویل بازوی ارسال شد</div>
-                            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['تحویل بازوی ارسال شد'] || 0}</div>
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-green-500 dark:border-green-400">
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">تحویل مشتری شد</div>
-                            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['تحویل مشتری شد'] || 0}</div>
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-teal-500 dark:border-teal-400">
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">محاسبه سود و زیان</div>
-                            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['محاسبه سود و زیان انجام شد'] || 0}</div>
-                        </div>
+                         <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-yellow-500 dark:border-yellow-400">
+                             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">باید بخرم</div>
+                             <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['باید بخرم'] || 0}</div>
+                         </div>
+                         <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-blue-500 dark:border-blue-400">
+                             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">خریداری شد</div>
+                             <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['خریداری شد'] || 0}</div>
+                         </div>
+                         <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-purple-500 dark:border-purple-400">
+                             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">تحویل بازوی ارسال شد</div>
+                             <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['تحویل بازوی ارسال شد'] || 0}</div>
+                         </div>
+                         <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-green-500 dark:border-green-400">
+                             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">تحویل مشتری شد</div>
+                             <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['تحویل مشتری شد'] || 0}</div>
+                         </div>
+                         <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow border-r-4 border-teal-500 dark:border-teal-400">
+                             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">محاسبه سود و زیان</div>
+                             <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{summaryData['محاسبه سود و زیان انجام شد'] || 0}</div>
+                         </div>
                      </div>
 
                      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm mb-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {/* Row 1: Filters */}
-                            <div>
-                                <label htmlFor="status-filter" className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">فیلتر وضعیت:</label>
-                                <div className="relative">
-                                    <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full p-2.5 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none">
-                                        <option value="All">همه وضعیت ها</option>
-                                        {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                                    </select>
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
-                                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <label htmlFor="start-date" className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">از تاریخ:</label>
-                                <input 
-                                    id="start-date" 
-                                    type="date" 
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-full p-2.5 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="end-date" className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">تا تاریخ:</label>
-                                <input 
-                                    id="end-date" 
-                                    type="date" 
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-full p-2.5 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                                />
-                            </div>
-                            <div className="self-end">
-                                <button
-                                    onClick={() => { setStartDate(''); setEndDate(''); }}
-                                    className="w-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 py-2.5 px-4 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-200 dark:border-gray-600"
-                                >
-                                    پاک کردن تاریخ
-                                </button>
-                            </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                             {/* Row 1: Filters */}
+                             <div>
+                                 <label htmlFor="status-filter" className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">فیلتر وضعیت:</label>
+                                 <div className="relative">
+                                     <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full p-2.5 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none">
+                                         <option value="All">همه وضعیت ها</option>
+                                         {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                     </select>
+                                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                                         <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                     </div>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label htmlFor="start-date" className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">از تاریخ:</label>
+                                 <input 
+                                     id="start-date" 
+                                     type="date" 
+                                     value={startDate}
+                                     onChange={(e) => setStartDate(e.target.value)}
+                                     className="w-full p-2.5 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                 />
+                             </div>
+                             <div>
+                                 <label htmlFor="end-date" className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">تا تاریخ:</label>
+                                 <input 
+                                     id="end-date" 
+                                     type="date" 
+                                     value={endDate}
+                                     onChange={(e) => setEndDate(e.target.value)}
+                                     className="w-full p-2.5 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                 />
+                             </div>
+                             <div className="self-end">
+                                 <button
+                                     onClick={() => { setStartDate(''); setEndDate(''); }}
+                                     className="w-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 py-2.5 px-4 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-200 dark:border-gray-600"
+                                 >
+                                     پاک کردن تاریخ
+                                 </button>
+                             </div>
 
-                            {/* Row 2: Search & Merge */}
-                            <div className="md:col-span-2">
-                                <label htmlFor="search-filter" className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">جستجو پیشرفته:</label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                    </div>
-                                    <input 
-                                        id="search-filter"
-                                        type="text"
-                                        placeholder="شماره PO، شماره تقاضا، نام تامین کننده، نام مشتری..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full p-2.5 pr-10 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-                            {/* NEW: Checkbox to hide cancelled demands */}
-                            <div className="self-end flex items-center justify-start h-[42px] bg-gray-50 dark:bg-gray-700/50 rounded-lg px-4 border border-gray-200 dark:border-gray-700">
-                                <input 
-                                    type="checkbox"
-                                    id="hide-cancelled"
-                                    checked={hideCancelled}
-                                    onChange={(e) => setHideCancelled(e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 ml-2"
-                                />
-                                <label htmlFor="hide-cancelled" className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none">
-                                    مخفی کردن تقاضاهای لغو شده
-                                </label>
-                            </div>
-                            <div className="self-end">
-                                <button 
-                                    onClick={() => setShowMergeConfirm(true)}
-                                    disabled={!mergeInfo.possible}
-                                    className={`w-full py-2.5 px-4 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${mergeInfo.possible 
-                                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white transform hover:-translate-y-0.5' 
-                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'}`}
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                                    ادغام ({selectedPOs.size}) سفارش
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                             {/* Row 2: Search & Merge */}
+                             <div className="md:col-span-2">
+                                 <label htmlFor="search-filter" className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">جستجو پیشرفته:</label>
+                                 <div className="relative">
+                                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                     </div>
+                                     <input 
+                                         id="search-filter"
+                                         type="text"
+                                         placeholder="شماره PO، شماره تقاضا، نام تامین کننده، نام مشتری..."
+                                         value={searchTerm}
+                                         onChange={(e) => setSearchTerm(e.target.value)}
+                                         className="w-full p-2.5 pr-10 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                     />
+                                 </div>
+                             </div>
+                             {/* Checkbox to hide cancelled demands */}
+                             <div className="self-end flex items-center justify-start h-[42px] bg-gray-50 dark:bg-gray-700/50 rounded-lg px-4 border border-gray-200 dark:border-gray-700">
+                                 <input 
+                                     type="checkbox"
+                                     id="hide-cancelled"
+                                     checked={hideCancelled}
+                                     onChange={(e) => setHideCancelled(e.target.checked)}
+                                     className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 ml-2"
+                                 />
+                                 <label htmlFor="hide-cancelled" className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                                     مخفی کردن تقاضاهای لغو شده
+                                 </label>
+                             </div>
+                             <div className="self-end">
+                                 <button 
+                                     onClick={() => setShowMergeConfirm(true)}
+                                     disabled={!mergeInfo.possible}
+                                     className={`w-full py-2.5 px-4 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${mergeInfo.possible 
+                                         ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white transform hover:-translate-y-0.5' 
+                                         : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'}`}
+                                 >
+                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                                     ادغام ({selectedPOs.size}) سفارش
+                                 </button>
+                             </div>
+                         </div>
+                     </div>
 
                      {isLoading && <div className="spinner"></div>}
                      {error && <p className="text-center p-8 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-900">{error}</p>}
@@ -1450,7 +1503,7 @@
                              {/* Desktop Table */}
                              <div className="hidden md:block overflow-x-auto">
                                  <table className="w-full text-right">
-                                     <thead className="bg-gray-5 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm uppercase">
+                                     <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm uppercase">
                                          <tr className="border-b dark:border-gray-700">
                                              <th className="p-4 w-12 text-center">
                                                  <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
@@ -1480,7 +1533,7 @@
                                      </thead>
                                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
                                          {displayedPOs.map(po => (
-                                             <tr key={po.id} className="hover:bg-gray-5 dark:hover:bg-gray-700/50 transition-colors duration-150">
+                                             <tr key={po.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
                                                  <td className="p-4 text-center">
                                                      {po.status === 'باید بخرم' && (
                                                          <input 
@@ -1495,9 +1548,9 @@
                                                  <td className="p-4 font-mono text-gray-500">{po.demandid}</td>
                                                  <td className="p-4 font-mono text-center text-gray-500">{po.realInvoiceId || '-'}</td>
                                                  <td className="p-4">
-                                                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDemandStatusStyles(po.demand?.status)}`}>
-                                                        {po.demand?.status || '---'}
-                                                    </span>
+                                                     <span className={`px-2.5 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDemandStatusStyles(po.demand?.status)}`}>
+                                                         {po.demand?.status || '---'}
+                                                     </span>
                                                  </td>
                                                  <td className="p-4 font-medium">{po.supplier?.fullname || 'نامشخص'}</td>
                                                  <td className="p-4 text-gray-600 dark:text-gray-300">{po.demand?.customer?.fullname || 'نامشخص'}</td>
@@ -1509,30 +1562,30 @@
                                                  <td className="p-4 font-mono text-center text-gray-600 dark:text-gray-400">{formatCurrency(po.actual_shipping_cost || 0)}</td>
                                                  <td className="p-4 font-bold text-gray-800 dark:text-gray-200">{formatCurrency(po.totalAmount)}</td>
                                                  <td className="p-4">
-                                                      <select
-                                                          value={po.status}
-                                                          onChange={(e) => {
-                                                              if (e.target.value !== po.status) {
-                                                                  setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
-                                                              }
-                                                          }}
-                                                          className={`rounded-lg p-1.5 text-xs font-semibold w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-gray-800 ${getStatusStyles(po.status)}`}
-                                                      >
-                                                          {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                                                      </select>
+                                                     <select
+                                                         value={po.status}
+                                                         onChange={(e) => {
+                                                             if (e.target.value !== po.status) {
+                                                                 setStatusUpdateInfo({ poId: po.id, newStatus: e.target.value, oldStatus: po.status });
+                                                             }
+                                                         }}
+                                                         className={`rounded-lg p-1.5 text-xs font-semibold w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-gray-800 ${getStatusStyles(po.status)}`}
+                                                     >
+                                                         {PO_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                                     </select>
                                                  </td>
                                                  <td className="p-4">
-                                                      <div className="flex items-center justify-center gap-2">
-                                                         <button onClick={() => setEditingPO(po)} className="text-yellow-600 dark:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 p-1.5 rounded-lg transition-colors" title="ویرایش">
-                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                                         </button>
+                                                     <div className="flex items-center justify-center gap-2">
+                                                        <button onClick={() => setEditingPO(po)} className="text-yellow-600 dark:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 p-1.5 rounded-lg transition-colors" title="ویرایش">
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                                        </button>
                                                          <button onClick={() => setViewingPO(po)} className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 p-1.5 rounded-lg transition-colors" title="جزئیات">
                                                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                                                          </button>
                                                          <button onClick={() => setPrintingPO(po)} className="text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 p-1.5 rounded-lg transition-colors" title="چاپ">
                                                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                                          </button>
-                                                      </div>
+                                                     </div>
                                                  </td>
                                              </tr>
                                          ))}
@@ -1546,32 +1599,32 @@
                                           <div className="flex justify-between items-start mb-3 pb-3 border-b border-dashed border-gray-200 dark:border-gray-700">
                                               <div className="flex items-start gap-3">
                                                   {po.status === 'باید بخرم' && (
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="rounded h-5 w-5 mt-1 text-indigo-600"
-                                                        checked={selectedPOs.has(po.id)}
-                                                        onChange={() => handleSelectPO(po.id)}
-                                                    />
-                                                  )}
-                                                  <div>
-                                                      <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-bold bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300">PO #{po.id}</span>
-                                                        <span className="text-xs text-gray-400">{new Date(po.created_at).toLocaleDateString('fa-IR')}</span>
-                                                      </div>
-                                                      <p className="font-bold text-gray-900 dark:text-white mt-1">{po.supplier?.fullname || 'نامشخص'}</p>
-                                                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{po.demand?.customer?.fullname || 'مشتری نامشخص'}</p>
-                                                      <p className={`text-sm mt-1 font-semibold ${customerBalances[po.demand?.customeruserid] < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                          مانده حساب: {customerBalances[po.demand?.customeruserid] !== undefined ? `${formatCurrency(customerBalances[po.demand?.customeruserid])} تومان` : '...'}
-                                                      </p>
-                                                      
-                                                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                                                        <span className="text-xs text-gray-500">تقاضا: {po.demandid}</span>
-                                                        {po.realInvoiceId && <span className="text-xs text-gray-500">فاکتور: {po.realInvoiceId}</span>}
-                                                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full whitespace-nowrap ${getDemandStatusStyles(po.demand?.status)}`}>
-                                                            {po.demand?.status || '---'}
-                                                        </span>
-                                                      </div>
-                                                  </div>
+                                                      <input 
+                                                          type="checkbox" 
+                                                          className="rounded h-5 w-5 mt-1 text-indigo-600"
+                                                          checked={selectedPOs.has(po.id)}
+                                                          onChange={() => handleSelectPO(po.id)}
+                                                      />
+                                                   )}
+                                                   <div>
+                                                       <div className="flex items-center gap-2">
+                                                            <span className="text-xs font-bold bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300">PO #{po.id}</span>
+                                                            <span className="text-xs text-gray-400">{new Date(po.created_at).toLocaleDateString('fa-IR')}</span>
+                                                       </div>
+                                                       <p className="font-bold text-gray-900 dark:text-white mt-1">{po.supplier?.fullname || 'نامشخص'}</p>
+                                                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{po.demand?.customer?.fullname || 'مشتری نامشخص'}</p>
+                                                        <p className={`text-sm mt-1 font-semibold ${customerBalances[po.demand?.customeruserid] < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                            مانده حساب: {customerBalances[po.demand?.customeruserid] !== undefined ? `${formatCurrency(customerBalances[po.demand?.customeruserid])} تومان` : '...'}
+                                                        </p>
+                                                        
+                                                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                            <span className="text-xs text-gray-500">تقاضا: {po.demandid}</span>
+                                                            {po.realInvoiceId && <span className="text-xs text-gray-500">فاکتور: {po.realInvoiceId}</span>}
+                                                            <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full whitespace-nowrap ${getDemandStatusStyles(po.demand?.status)}`}>
+                                                                {po.demand?.status || '---'}
+                                                            </span>
+                                                        </div>
+                                                   </div>
                                               </div>
                                           </div>
                                           
@@ -1636,13 +1689,13 @@
                                      </button>
                                  </div>
                              )}
-                          </div>
+                         </div>
                      )}
-                       {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} customerBalance={customerBalances[viewingPO?.demand?.customeruserid]} />}
-                       {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} customerBalance={customerBalances[editingPO?.demand?.customeruserid]} />}
-                       {printingPO && <PrintablePOModal po={printingPO} onClose={() => setPrintingPO(null)} />}
-                       {showMergeConfirm && <MergeConfirmationModal mergeInfo={mergeInfo} onCancel={() => setShowMergeConfirm(false)} onConfirm={handleConfirmMerge} isMerging={isMerging} />}
-                       <StatusConfirmationModal updateInfo={statusUpdateInfo} onCancel={() => setStatusUpdateInfo(null)} onConfirm={executeStatusUpdate} isUpdating={isUpdatingStatus} />
+                        {viewingPO && <ViewPOModal po={viewingPO} onClose={() => setViewingPO(null)} customerBalance={customerBalances[viewingPO?.demand?.customeruserid]} />}
+                        {editingPO && <EditPOModal po={editingPO} onClose={() => setEditingPO(null)} onSave={handleSavePO} customerBalance={customerBalances[editingPO?.demand?.customeruserid]} />}
+                        {printingPO && <PrintablePOModal po={printingPO} onClose={() => setPrintingPO(null)} />}
+                        {showMergeConfirm && <MergeConfirmationModal mergeInfo={mergeInfo} onCancel={() => setShowMergeConfirm(false)} onConfirm={handleConfirmMerge} isMerging={isMerging} />}
+                        <StatusConfirmationModal updateInfo={statusUpdateInfo} onCancel={() => setStatusUpdateInfo(null)} onConfirm={executeStatusUpdate} isUpdating={isUpdatingStatus} />
                  </div>
             );
         };
